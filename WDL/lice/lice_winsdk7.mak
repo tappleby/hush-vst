@@ -256,7 +256,7 @@ tinyxml : $(TINYXML)
 LICE = \
 "$(INTDIR)/lice.obj" \
 "$(INTDIR)/lice_arc.obj" \
-#"$(INTDIR)/lice_bmp.obj" \
+"$(INTDIR)/lice_bmp.obj" \
 #"$(INTDIR)/lice_colorspace.obj" \
 #"$(INTDIR)/lice_gif.obj" \
 #"$(INTDIR)/lice_gl_ctx.obj" \
@@ -265,12 +265,13 @@ LICE = \
 #"$(INTDIR)/lice_jpg.obj" \
 #"$(INTDIR)/lice_jpg_write.obj" \
 "$(INTDIR)/lice_line.obj" \
+#"$(INTDIR)/lice_palette.obj" \
 #"$(INTDIR)/lice_pcx.obj" \
 "$(INTDIR)/lice_png.obj" \
 #"$(INTDIR)/lice_png_write.obj" \
 #"$(INTDIR)/lice_svg.obj" \
 #"$(INTDIR)/lice_texgen.obj" \
-#"$(INTDIR)/lice_text.obj" \
+"$(INTDIR)/lice_text.obj" \
 #"$(INTDIR)/lice_textnew.obj"
 
 lice : $(LICE)
