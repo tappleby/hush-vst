@@ -31,15 +31,18 @@
 class ProjectStateContext_Mem : public ProjectStateContext
 {
 public:
+
   ProjectStateContext_Mem(WDL_HeapBuf *hb) 
   { 
     m_heapbuf=hb; 
     m_pos=0; 
-    #ifdef WDL_MEMPROJECTCONTEXT_USE_ZLIB
-      memset(&m_compstream,0,sizeof(m_compstream));
-      m_usecomp=0;
-    #endif
+    m_tmpflag=0;
+#ifdef WDL_MEMPROJECTCONTEXT_USE_ZLIB
+    memset(&m_compstream,0,sizeof(m_compstream));
+    m_usecomp=0;
+#endif
   }
+
   virtual ~ProjectStateContext_Mem() 
   { 
     #ifdef WDL_MEMPROJECTCONTEXT_USE_ZLIB
@@ -55,15 +58,17 @@ public:
     #endif
   };
 
-
-
   virtual void AddLine(const char *fmt, ...);
-  virtual int GetLine(char *buf, int buflen); // returns -1 on eof
+  virtual int GetLine(char *buf, int buflen); // returns -1 on eof  
 
   virtual WDL_INT64 GetOutputSize() { return m_heapbuf ? m_heapbuf->GetSize() : 0; }
 
+  virtual int GetTempFlag() { return m_tmpflag; }
+  virtual void SetTempFlag(int flag) { m_tmpflag=flag; }
+  
   int m_pos;
   WDL_HeapBuf *m_heapbuf;
+  int m_tmpflag;
 
 #ifdef WDL_MEMPROJECTCONTEXT_USE_ZLIB
   int DecompressData()
@@ -193,21 +198,34 @@ int ProjectStateContext_Mem::GetLine(char *buf, int buflen) // returns -1 on eof
   }
   if (m_usecomp==2)
   {
-    char *p = (char*) m_compdatabuf.Get();
-    int x;
-    for (x = 0; x < m_compdatabuf.Available() && p[x]; x ++);
-    while (x >= m_compdatabuf.Available())
+    int x=0;
+    for (;;)
     {
-      int err = DecompressData();
-      p = (char *)m_compdatabuf.Get();
-      for (; x < m_compdatabuf.Available() && p[x]; x ++);
+      const char *p = (const char*) m_compdatabuf.Get();
+      for (x = 0; x < m_compdatabuf.Available() && p[x] && p[x] != '\r' && p[x] != '\n'; x ++);
+      while (x >= m_compdatabuf.Available())
+      {
+        int err = DecompressData();
+        p = (const char *)m_compdatabuf.Get();
+        for (; x < m_compdatabuf.Available() && p[x] && p[x] != '\r' && p[x] != '\n'; x ++);
 
-      if (err) break;
+        if (err) break;
+      }
+
+      if (x||!m_compdatabuf.Available()) break;
+
+      m_compdatabuf.Advance(1); // skip over nul or newline char
     }
 
-    if (x>=m_compdatabuf.Available()) return -1; 
+    if (!x) return -1;
 
-    lstrcpyn(buf,(char*)m_compdatabuf.Get(),buflen);
+    if (buflen > 0 && buf)
+    {
+      int l = min(buflen-1,x);
+      memcpy(buf,m_compdatabuf.Get(),l);
+      buf[l]=0;
+    }
+
     m_compdatabuf.Advance(x+1);
     m_compdatabuf.Compact();
     return 0;
@@ -215,24 +233,33 @@ int ProjectStateContext_Mem::GetLine(char *buf, int buflen) // returns -1 on eof
 #endif
   
 
-  if (m_pos >= m_heapbuf->GetSize()) return -1;
-  char *curptr=(char *)m_heapbuf->Get() + m_pos;
-  
-  int cpl = strlen(curptr);
-  if (buflen > 0)
+  int avail = m_heapbuf->GetSize() - m_pos;
+  const char *p=(const char *)m_heapbuf->Get() + m_pos;
+  while (avail > 0 && (p[0] =='\r'||p[0]=='\n'||!p[0]||p[0] == ' ' || p[0] == '\t'))
   {
-    int a = buflen-1;
-    if (a > cpl) a=cpl;
-    memcpy(buf,curptr,a);
-    buf[a]=0;
+    p++;
+    m_pos++;
+    avail--;
   }
-  m_pos += cpl+1;
+  if (avail <= 0) return -1;
+  
+  int x;
+  for (x = 0; x < avail && p[x] && p[x] != '\r' && p[x] != '\n'; x ++);
+  m_pos += x+1;
+
+  if (buflen > 0&&buf)
+  {
+    int l = min(buflen-1,x);
+    memcpy(buf,p,l);
+    buf[l]=0;
+  }
   return 0;
 }
 
 class ProjectStateContext_File : public ProjectStateContext
 {
 public:
+
   ProjectStateContext_File(WDL_FileRead *rd, WDL_FileWrite *wr) 
   { 
     m_rd=rd; 
@@ -240,6 +267,7 @@ public:
     m_indent=0; 
     m_bytesOut=0;
     m_errcnt=false; 
+    m_tmpflag=0;
   }
   virtual ~ProjectStateContext_File(){ delete m_rd; delete m_wr; };
 
@@ -248,6 +276,9 @@ public:
 
   virtual WDL_INT64 GetOutputSize() { return m_bytesOut; }
 
+  virtual int GetTempFlag() { return m_tmpflag; }
+  virtual void SetTempFlag(int flag) { m_tmpflag=flag; }    
+
   bool HasError() { return m_errcnt; }
 
   WDL_INT64 m_bytesOut WDL_FIXALIGN;
@@ -255,7 +286,7 @@ public:
   WDL_FileRead *m_rd;
   WDL_FileWrite *m_wr;
   int m_indent;
-
+  int m_tmpflag;
   bool m_errcnt;
 };
 

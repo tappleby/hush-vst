@@ -237,6 +237,7 @@ STANDARD_CONTROL_NEEDSDISPLAY_IMPL
   else if (msg==PBM_SETPOS)
   {
     [self setDoubleValue:(double)wParam];
+    [self stopAnimation:self];    
   }
   else if (msg==PBM_DELTAPOS)
   {
@@ -406,7 +407,16 @@ STANDARD_CONTROL_NEEDSDISPLAY_IMPL
 STANDARD_CONTROL_NEEDSDISPLAY_IMPL
 
 -(LONG)getSwellStyle { return style; }
--(void)setSwellStyle:(LONG)st { style=st; }
+
+-(void)setSwellStyle:(LONG)st 
+{
+  bool hdrchg= ((style&LVS_NOCOLUMNHEADER) != (st&LVS_NOCOLUMNHEADER));
+  style=st;
+  if ((style&LVS_REPORT) && hdrchg)
+  {
+    // todo some crap with NSTableView::setHeaderView, but it's complicated
+  }
+}
 
 -(id) init
 {
@@ -418,7 +428,8 @@ STANDARD_CONTROL_NEEDSDISPLAY_IMPL
   m_fakerightmouse=false;
   m_lbMode=0;
   m_start_item=-1;
-  m_start_item_clickmode=0;
+  m_start_subitem=-1;
+  m_start_item_clickmode=0; // 0=clicked item, 1=clicked image, &2=sent drag message
   m_cols = new WDL_PtrList<NSTableColumn>;
   m_items=new WDL_PtrList<SWELL_ListView_Row>;
   return ret;
@@ -506,6 +517,7 @@ STANDARD_CONTROL_NEEDSDISPLAY_IMPL
   {
     m_fakerightmouse=1;  
     m_start_item=-1;
+    m_start_subitem=-1;
   }
   else 
   {
@@ -515,6 +527,7 @@ STANDARD_CONTROL_NEEDSDISPLAY_IMPL
     NSPoint pt=[theEvent locationInWindow];
     pt=[self convertPoint:pt fromView:nil];
     m_start_item=[self rowAtPoint:pt];
+    m_start_subitem=[self columnAtPoint:pt];
     m_start_item_clickmode=0;
     
     if (m_start_item>=0 && m_status_imagelist && LVSIL_STATE == m_status_imagelist_type && pt.x <= [self rowHeight]) // in left area
@@ -530,18 +543,19 @@ STANDARD_CONTROL_NEEDSDISPLAY_IMPL
 {
   if (++m_leftmousemovecnt==4)
   {
-    if (m_start_item>=0&&!m_start_item_clickmode)
+    if (m_start_item>=0 && !m_start_item_clickmode)
     {
       if (!m_lbMode)
       {
         // if m_start_item isnt selected, change selection to it now
         if (![self isRowSelected:m_start_item]) [self selectRow:m_start_item byExtendingSelection:!!(GetAsyncKeyState(VK_CONTROL)&0x8000)];
-        NMLISTVIEW hdr={{(HWND)self,[self tag],LVN_BEGINDRAG},m_start_item,};
+        NMLISTVIEW hdr={{(HWND)self,[self tag],LVN_BEGINDRAG},m_start_item,m_start_subitem,0,};
         SendMessage((HWND)[self target],WM_NOTIFY,[self tag], (LPARAM) &hdr);
+        m_start_item_clickmode |= 2;
       }
     }
   }
-  else if (m_leftmousemovecnt>4&&!m_start_item_clickmode)
+  else if (m_leftmousemovecnt > 4 && !(m_start_item_clickmode&1))
   {
     HWND tgt=(HWND)[self target];
     POINT p;
@@ -555,8 +569,10 @@ STANDARD_CONTROL_NEEDSDISPLAY_IMPL
 -(void)mouseUp:(NSEvent *)theEvent
 {
   if (m_fakerightmouse||([theEvent modifierFlags] & NSControlKeyMask))
+  {
     [self rightMouseUp:theEvent];
-  else if (!m_start_item_clickmode)
+  }
+  else if (!(m_start_item_clickmode&1))
   {
     if (m_leftmousemovecnt>=0 && m_leftmousemovecnt<4)
     {
@@ -577,7 +593,7 @@ STANDARD_CONTROL_NEEDSDISPLAY_IMPL
     }
   }
   
-  if (!m_lbMode)
+  if (!m_lbMode && !(m_start_item_clickmode&2))
   {
     NSPoint pt=[theEvent locationInWindow];
     pt=[self convertPoint:pt fromView:nil];    
@@ -595,7 +611,19 @@ STANDARD_CONTROL_NEEDSDISPLAY_IMPL
   
   if (!m_lbMode) 
   {
-    NMCLICK nmlv={{(HWND)self,[self tag], NM_RCLICK},};
+    NSPoint pt=[theEvent locationInWindow];
+    pt=[self convertPoint:pt fromView:nil];
+    
+    // note, windows selects on right mousedown    
+    int row=[self rowAtPoint:pt];
+    if (row >= 0 && ![self isRowSelected:row])
+    {
+      NSIndexSet* rows=[NSIndexSet indexSetWithIndex:row];
+      [self deselectAll:self];
+      [self selectRowIndexes:rows byExtendingSelection:NO];
+    }       
+    
+    NMLISTVIEW nmlv={{(HWND)self,[self tag], NM_RCLICK}, [self rowAtPoint:pt], [self columnAtPoint:pt], 0, 0, 0, {pt.x, pt.y}, };
     if (SendMessage((HWND)[self target],WM_NOTIFY,nmlv.hdr.idFrom,(LPARAM)&nmlv)) wantContext=false;
   }
   if (wantContext)
@@ -1425,6 +1453,15 @@ static NSView *NavigateUpScrollClipViews(NSView *ch)
   return ch;
 }
 
+HWND SWELL_NavigateUpScrollClipViews(HWND h)
+{
+  NSView *v = 0;
+  if (h && [(id)h isKindOfClass:[NSView class]]) v = (NSView *)h;
+  else if (h && [(id)h isKindOfClass:[NSWindow class]]) v = [(NSWindow *)h contentView];
+  if (v)
+    return (HWND)NavigateUpScrollClipViews(v);
+  return 0;
+}
 
 bool GetWindowRect(HWND hwnd, RECT *r)
 {
@@ -3088,6 +3125,10 @@ HWND SWELL_MakeControl(const char *cname, int idx, const char *classname, int st
     [obj setMinValue:0.0];
     [obj setMaxValue:1000.0];
     [obj setFrame:MakeCoords(x,y,w,h,false)];
+    if (!stricmp(classname, "msctls_trackbar32"))
+    {
+      [[obj cell] setControlSize:NSMiniControlSize];
+    }
     [obj setTarget:ACTIONTARGET];
     [obj setAction:@selector(onSwellCommand:)];
     if (style&SWELL_NOT_WS_VISIBLE) [obj setHidden:YES];
@@ -3854,18 +3895,12 @@ static bool ListViewGetRectImpl(HWND h, int item, int subitem, RECT* r) // subit
   NSRect ar;
   if (subitem < 0) ar = [tv rectOfRow:item];
   else ar=[tv frameOfCellAtColumn:subitem row:item];
+  NSSize sp=[tv intercellSpacing];
   
   r->left=(int)ar.origin.x;
   r->top=(int)ar.origin.y;
-  r->right=r->left+(int)ar.size.width;
-  r->bottom=r->top+(int)ar.size.height;
-
-// on windows this seems to return coordinates in parent view, lets match that
-  ClientToScreen(h,(LPPOINT)r);
-  ClientToScreen(h,((LPPOINT)r)+1);
-  HWND hwndDlg=GetParent(h);
-  ScreenToClient(hwndDlg,(LPPOINT)r);
-  ScreenToClient(hwndDlg,((LPPOINT)r)+1);
+  r->right=(int)(ar.origin.x+ar.size.width+sp.width);
+  r->bottom=(int)(ar.origin.y+ar.size.height+sp.height);
   
   return true;
 }
@@ -4997,20 +5032,30 @@ void SWELL_DrawFocusRect(HWND hwndPar, RECT *rct, void **handle)
       *handle=0;
     }
   }
-  else if (hwndPar)
+  else 
   {
     RECT r=*rct;
-    ClientToScreen(hwndPar,((LPPOINT)&r));
-    ClientToScreen(hwndPar,((LPPOINT)&r)+1);
+    if (hwndPar)
+    {
+      ClientToScreen(hwndPar,((LPPOINT)&r));
+      ClientToScreen(hwndPar,((LPPOINT)&r)+1);
+    }
+    else
+    {
+      // todo: flip?
+    }
     if (r.top>r.bottom) { int a=r.top; r.top=r.bottom;r.bottom=a; }
     NSRect rr=NSMakeRect(r.left,r.top,r.right-r.left,r.bottom-r.top);
     
     if (!wnd)
     {
       NSWindow *par=nil;
-      if ([(id)hwndPar isKindOfClass:[NSWindow class]]) par=(NSWindow *)hwndPar;
-      else if ([(id)hwndPar isKindOfClass:[NSView class]]) par=[(NSView *)hwndPar window];
-      else return;
+      if (hwndPar)
+      {
+        if ([(id)hwndPar isKindOfClass:[NSWindow class]]) par=(NSWindow *)hwndPar;
+        else if ([(id)hwndPar isKindOfClass:[NSView class]]) par=[(NSView *)hwndPar window];
+        else return;
+      }
       
       *handle  = wnd = [[NSWindow alloc] initWithContentRect:rr styleMask:NSBorderlessWindowMask backing:NSBackingStoreBuffered defer:YES];
       [wnd setOpaque:YES];
@@ -5019,7 +5064,7 @@ void SWELL_DrawFocusRect(HWND hwndPar, RECT *rct, void **handle)
       [wnd setIgnoresMouseEvents:YES];
       [wnd setContentView:[[SWELL_FocusRectWnd alloc] init]];
       
-      [par addChildWindow:wnd ordered:NSWindowAbove];
+      if (par) [par addChildWindow:wnd ordered:NSWindowAbove];
       //    [wnd setParentWindow:par];
 //      [wnd orderWindow:NSWindowAbove relativeTo:[par windowNumber]];
     }

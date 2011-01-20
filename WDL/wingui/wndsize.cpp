@@ -36,10 +36,13 @@ For information on how to use this class, see wndsize.h :)
 void WDL_WndSizer::init(HWND hwndDlg, RECT *initr)
 {
   m_hwnd=hwndDlg;
+  RECT r={0,};
   if (initr)
-    m_orig_rect=*initr;
-  else
-    GetClientRect(m_hwnd,&m_orig_rect);
+    r=*initr;
+  else if (m_hwnd) 
+    GetClientRect(m_hwnd,&r);
+  set_orig_rect(&r);
+
   m_list.Resize(0);
 
   memset(&m_margins,0,sizeof(m_margins));
@@ -82,9 +85,11 @@ void WDL_WndSizer::init_itemhwnd(HWND h, float left_scale, float top_scale, floa
   else if (h)
   {
     GetWindowRect(h,&this_r);
-    ScreenToClient(m_hwnd,(LPPOINT) &this_r);
-    ScreenToClient(m_hwnd,((LPPOINT) &this_r)+1);
-    
+    if (m_hwnd)
+    {
+      ScreenToClient(m_hwnd,(LPPOINT) &this_r);
+      ScreenToClient(m_hwnd,((LPPOINT) &this_r)+1);
+    }    
   #ifndef _WIN32
     if (this_r.bottom < this_r.top)
     {
@@ -111,7 +116,8 @@ void WDL_WndSizer::init_itemhwnd(HWND h, float left_scale, float top_scale, floa
 
 void WDL_WndSizer::init_item(int dlg_id, float left_scale, float top_scale, float right_scale, float bottom_scale, RECT *initr)
 {
-  init_itemhwnd(GetDlgItem(m_hwnd,dlg_id),left_scale,top_scale,right_scale,bottom_scale,initr);
+  if (m_hwnd)
+    init_itemhwnd(GetDlgItem(m_hwnd,dlg_id),left_scale,top_scale,right_scale,bottom_scale,initr);
 }
 
 #ifdef _WIN32
@@ -124,9 +130,11 @@ BOOL CALLBACK WDL_WndSizer::enum_RegionRemove(HWND hwnd,LPARAM lParam)
   {
     RECT r;
     GetWindowRect(hwnd,&r);
-    ScreenToClient(_this->m_hwnd,(LPPOINT)&r);
-    ScreenToClient(_this->m_hwnd,((LPPOINT)&r)+1);
-
+    if (_this->m_hwnd)
+    {
+      ScreenToClient(_this->m_hwnd,(LPPOINT)&r);
+      ScreenToClient(_this->m_hwnd,((LPPOINT)&r)+1);
+    }
     HRGN rgn2=CreateRectRgn(r.left,r.top,r.right,r.bottom);
     CombineRgn(_this->m_enum_rgn,_this->m_enum_rgn,rgn2,RGN_DIFF);
     DeleteObject(rgn2);
@@ -138,7 +146,7 @@ BOOL CALLBACK WDL_WndSizer::enum_RegionRemove(HWND hwnd,LPARAM lParam)
 
 void WDL_WndSizer::remove_item(int dlg_id)
 {
-  remove_itemhwnd(GetDlgItem(m_hwnd,dlg_id));
+  if (m_hwnd) remove_itemhwnd(GetDlgItem(m_hwnd,dlg_id));
 }
 
 void WDL_WndSizer::remove_itemhwnd(HWND h)
@@ -171,6 +179,40 @@ void WDL_WndSizer::remove_itemvirt(WDL_VirtualWnd *vwnd)
   }
 }
 
+void WDL_WndSizer::transformRect(RECT *r, const float *scales, const RECT *wndSize)
+{
+  POINT sz = { wndSize->right, wndSize->bottom };
+
+  sz.x -= m_margins.left+m_margins.right;
+  sz.y -= m_margins.top+m_margins.bottom;
+
+  if (sz.x < m_min_size.x) sz.x=m_min_size.x;
+  if (sz.y < m_min_size.y) sz.y=m_min_size.y;
+
+  sz.x -= m_orig_size.x;
+  sz.y -= m_orig_size.y;
+
+  if (scales[0] >= 1.0) r->left += sz.x;
+  else if (scales[0]>0.0) r->left += (int) (sz.x*scales[0]);
+
+  if (scales[1] >= 1.0) r->top += sz.y;
+  else if (scales[1]>0.0) r->top += (int) (sz.y*scales[1]);
+
+  if (scales[2] >= 1.0) r->right += sz.x;
+  else if (scales[2]>0.0) r->right += (int) (sz.x*scales[2]);
+
+  if (scales[3] >= 1.0) r->bottom += sz.y;
+  else if (scales[3]>0.0) r->bottom += (int) (sz.y*scales[3]);
+
+  r->left += m_margins.left;
+  r->right += m_margins.left;
+  r->top += m_margins.top;
+  r->bottom += m_margins.top;
+
+  if (r->bottom < r->top) r->bottom=r->top;
+  if (r->right < r->left) r->right=r->left;
+}
+
 
 void WDL_WndSizer::onResize(HWND only, int notouch, int xtranslate, int ytranslate)
 {
@@ -190,40 +232,14 @@ void WDL_WndSizer::onResize(HWND only, int notouch, int xtranslate, int ytransla
   WDL_WndSizer__rec *rec=(WDL_WndSizer__rec *) ((char *)m_list.Get());
   int cnt=m_list.GetSize() / sizeof(WDL_WndSizer__rec);
 
-  new_rect.right -= m_margins.left+m_margins.right;
-  new_rect.bottom -= m_margins.top+m_margins.bottom;
-
   int x;
   for (x = 0; x < cnt; x ++)
   {
 
     if ((rec->vwnd && !only) || (rec->hwnd && (!only || only == rec->hwnd)))
     {
-      RECT r;
-      if (rec->scales[0] <= 0.0) r.left = rec->orig.left;
-      else if (rec->scales[0] >= 1.0) r.left = rec->orig.left + new_rect.right - m_orig_rect.right;
-      else r.left = rec->orig.left + (int) ((new_rect.right - m_orig_rect.right)*rec->scales[0]);
-
-      if (rec->scales[1] <= 0.0) r.top = rec->orig.top;
-      else if (rec->scales[1] >= 1.0) r.top = rec->orig.top + new_rect.bottom - m_orig_rect.bottom;
-      else r.top = rec->orig.top + (int) ((new_rect.bottom - m_orig_rect.bottom)*rec->scales[1]);
-
-      if (rec->scales[2] <= 0.0) r.right = rec->orig.right;
-      else if (rec->scales[2] >= 1.0) r.right = rec->orig.right + new_rect.right - m_orig_rect.right;
-      else r.right = rec->orig.right + (int) ((new_rect.right - m_orig_rect.right)*rec->scales[2]);
-
-      if (rec->scales[3] <= 0.0) r.bottom = rec->orig.bottom;
-      else if (rec->scales[3] >= 1.0) r.bottom = rec->orig.bottom + new_rect.bottom - m_orig_rect.bottom;
-      else r.bottom = rec->orig.bottom + (int) ((new_rect.bottom - m_orig_rect.bottom)*rec->scales[3]);
-
-
-      r.left += m_margins.left;
-      r.right += m_margins.left;
-      r.top += m_margins.top;
-      r.bottom += m_margins.top;
-
-      if (r.bottom < r.top) r.bottom=r.top;
-      if (r.right < r.left) r.right=r.left;
+      RECT r=rec->orig;
+      transformRect(&r,rec->scales,&new_rect);
     
       rec->last = r;
 
@@ -318,5 +334,5 @@ WDL_WndSizer__rec *WDL_WndSizer::get_item(int dlg_id)
     rec++;
   }
 
-  return get_itembywnd(GetDlgItem(m_hwnd,dlg_id));
+  return m_hwnd ? get_itembywnd(GetDlgItem(m_hwnd,dlg_id)) : 0;
 }

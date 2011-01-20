@@ -77,7 +77,13 @@ struct WDL_WndSizer__rec
 class WDL_WndSizer
 {
 public:
-  WDL_WndSizer() {  }
+  WDL_WndSizer() 
+  { 
+    m_hwnd=NULL; 
+    memset(&m_min_size,0,sizeof(m_min_size));
+    memset(&m_orig_size,0,sizeof(m_orig_size));
+    memset(&m_margins,0,sizeof(m_margins));
+  }
   ~WDL_WndSizer() { }
 
   void init(HWND hwndDlg, RECT *initr=NULL);
@@ -97,8 +103,14 @@ public:
   WDL_WndSizer__rec *get_itembywnd(HWND h);
   WDL_WndSizer__rec *get_itembyvirt(WDL_VWnd *vwnd);
   
-  RECT get_orig_rect() { return m_orig_rect; }
-  void set_orig_rect(RECT *r) { if (r) m_orig_rect = *r; }
+  RECT get_orig_rect() { RECT r={0,0,m_orig_size.x,m_orig_size.y}; return r; }
+  void set_orig_rect(const RECT *r, const POINT *minSize=NULL) 
+  {
+    if (r) { m_orig_size.x = r->right; m_orig_size.y = r->bottom; } 
+    if (minSize) m_min_size = *minSize;
+    else m_min_size.x=m_min_size.y=0;
+  }
+  POINT get_min_size() { return m_min_size; }
 
   void onResize(HWND only=0, int notouch=0, int xtranslate=0, int ytranslate=0);
 
@@ -112,13 +124,15 @@ public:
     if (bottom) *bottom=m_margins.bottom;
   }
 
+  void transformRect(RECT *r, const float *scales, const RECT *wndSize);
+
 private:
 #ifdef _WIN32
   static BOOL CALLBACK enum_RegionRemove(HWND hwnd,LPARAM lParam);
   HRGN m_enum_rgn;
 #endif
   HWND m_hwnd;
-  RECT m_orig_rect;
+  POINT m_orig_size,m_min_size;
   RECT m_margins;
 
   // treat as WDL_WndSizer__rec[]
