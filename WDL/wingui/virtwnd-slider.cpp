@@ -30,6 +30,7 @@
 
 WDL_VirtualSlider::WDL_VirtualSlider()
 {
+  m_zl_color = m_knob_color=0;
   m_is_knob=false;
   m_tl_extra=m_br_extra=0;
   m_skininfo=0;
@@ -231,26 +232,17 @@ void WDL_VirtualSlider::OnPaint(LICE_IBitmap *drawbm, int origin_x, int origin_y
 
     if (!wantKnob)
     {
-      if (!back_image || (m_skininfo&&m_skininfo->zeroline_color))
+      int zlc = m_zl_color;
+      if (!zlc && m_skininfo) zlc = m_skininfo->zeroline_color;
+      if (!back_image || zlc)
       {
         int center=m_center;
         if (center < 0) center=WDL_STYLE_GetSliderDynamicCenterPos();
 
         int y=((m_maxr-center)*(viewh-bm_h2))/rsize + ((bm_h-1)/2-imgoffset);
 
-        if (m_skininfo && m_skininfo->zeroline_color)
-        {
-          LICE_Line(drawbm,origin_x+2,origin_y+y,origin_x+vieww-2,origin_y+y,
-            m_skininfo->zeroline_color,
-            LICE_GETA(m_skininfo->zeroline_color)/255.0,
-            LICE_BLIT_MODE_COPY,false);
-        }
-        else
-        {
-          LICE_pixel col = WDL_STYLE_GetSysColor(COLOR_BTNTEXT);
-          LICE_Line(drawbm,origin_x+2,origin_y+y,origin_x+vieww-2,origin_y+y,
-              LICE_RGBA_FROMNATIVE(col,255),1.0f,LICE_BLIT_MODE_COPY,false);
-        }
+        if (!zlc) zlc = LICE_RGBA_FROMNATIVE(WDL_STYLE_GetSysColor(COLOR_BTNTEXT),255);
+        LICE_Line(drawbm,origin_x+2,origin_y+y,origin_x+vieww-2,origin_y+y, zlc, LICE_GETA(zlc)/255.0, LICE_BLIT_MODE_COPY,false);
       }
 
 
@@ -308,13 +300,14 @@ void WDL_VirtualSlider::OnPaint(LICE_IBitmap *drawbm, int origin_x, int origin_y
     }
     else
     {
-      LICE_pixel col  = LICE_RGBA_FROMNATIVE(WDL_STYLE_GetSysColor(COLOR_3DHILIGHT),255);
+      LICE_pixel col  = m_knob_color ? m_knob_color : LICE_RGBA_FROMNATIVE(WDL_STYLE_GetSysColor(COLOR_3DHILIGHT),255);
 
+      float alpha = LICE_GETA(col)/255.0f;
       int cx=origin_x+vieww/2;
       int cy=origin_y+viewh/2;
       float rd = vieww/2-4;
       float r2=rd*0.125f;
-      if (!back_image) LICE_Circle(drawbm, cx, cy, rd, col, 1.0f, LICE_BLIT_MODE_COPY, true);
+      if (!back_image) LICE_Circle(drawbm, cx, cy, rd, col, alpha, LICE_BLIT_MODE_COPY, true);
 
       float val;
       
@@ -330,7 +323,7 @@ void WDL_VirtualSlider::OnPaint(LICE_IBitmap *drawbm, int origin_x, int origin_y
       float y1=cy-r2*cosa;
       float x2=cx+rd*sina;
       float y2=cy-rd*cosa;
-      LICE_FLine(drawbm, x1, y1, x2, y2, col, 1.0f, LICE_BLIT_MODE_COPY, true);
+      LICE_FLine(drawbm, x1, y1, x2, y2, col, alpha, LICE_BLIT_MODE_COPY, true);
 
     }
   }
@@ -367,25 +360,19 @@ void WDL_VirtualSlider::OnPaint(LICE_IBitmap *drawbm, int origin_x, int origin_y
 
     }
 
-    if (!back_image || (m_skininfo && m_skininfo->zeroline_color))
+    int zlc = m_zl_color;
+    if (!zlc && m_skininfo) zlc = m_skininfo->zeroline_color;
+    if (!back_image || zlc)
     {
       int center=m_center;
       if (center < 0) center=WDL_STYLE_GetSliderDynamicCenterPos();
 
       int x=((center-m_minr)*(vieww-bm_w2))/rsize + bm_w/2 - imgoffset;
-      if (m_skininfo && m_skininfo->zeroline_color)
-      {
-        LICE_Line(drawbm,origin_x+x,origin_y+2,origin_x+x,origin_y+viewh-2,
-          m_skininfo->zeroline_color,
-          LICE_GETA(m_skininfo->zeroline_color)/255.0,
-          LICE_BLIT_MODE_COPY,false);
-      }
-      else
-      {
-        LICE_pixel col = WDL_STYLE_GetSysColor(COLOR_BTNTEXT);
-        LICE_Line(drawbm,origin_x+x,origin_y+2,origin_x+x,origin_y+viewh-2,
-            LICE_RGBA_FROMNATIVE(col,255),1.0f,LICE_BLIT_MODE_COPY,false);
-      }
+
+      if (!zlc) zlc = LICE_RGBA_FROMNATIVE(WDL_STYLE_GetSysColor(COLOR_BTNTEXT),255);
+
+      LICE_Line(drawbm,origin_x+x,origin_y+2,origin_x+x,origin_y+viewh-2,
+        zlc, LICE_GETA(zlc)/255.0, LICE_BLIT_MODE_COPY,false);
     }
 
     if (!back_image)
@@ -885,6 +872,29 @@ void WDL_VirtualSlider::GetPositionPaintExtent(RECT *r)
       r->left-=ladj; //s;
       r->right += radj; // (bm_w2-bm_w)-s;
     }
+  }
+  // expand paintextent by background image outer extent if necessary
+  if (m_skininfo && m_skininfo->bgimagecfg[isVert].bgimage)
+  {
+    WDL_VirtualWnd_BGCfg *b = &m_skininfo->bgimagecfg[isVert];
+    if (b->bgimage_lt[0]>0 &&
+        b->bgimage_lt[1]>0 &&
+        b->bgimage_rb[0]>0 &&
+        b->bgimage_rb[1]>0 &&
+        b->bgimage_lt_out[0]>0 &&
+        b->bgimage_lt_out[1]>0 &&
+        b->bgimage_rb_out[0]>0 &&
+        b->bgimage_rb_out[1]>0)
+    {
+      int l = m_position.left - (b->bgimage_lt_out[0]-1);
+      int t = m_position.top - (b->bgimage_lt_out[1]-1);
+      int right = m_position.right + b->bgimage_rb_out[0]-1;
+      int bot = m_position.bottom + b->bgimage_rb_out[1]-1;
 
+      if (l < r->left) r->left=l;
+      if (t < r->top) r->top=t;
+      if (right > r->right) r->right = right;
+      if (bot > r->bottom) r->bottom = bot;
+    }
   }
 }

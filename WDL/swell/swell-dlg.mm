@@ -132,7 +132,7 @@ void SWELL_DoDialogColorUpdates(HWND hwnd, DLGPROC d, bool isUpdate)
     {
       if ([ch isKindOfClass:[NSButton class]] && [(NSButton *)ch image])
       {
-        if (!(had_flags&4))
+        if (!buttonFg && !(had_flags&4))
         {
           had_flags|=4;
           HDC__ *c = SWELL_GDP_CTX_NEW();
@@ -141,6 +141,8 @@ void SWELL_DoDialogColorUpdates(HWND hwnd, DLGPROC d, bool isUpdate)
             d(hwnd,WM_CTLCOLORBTN,(WPARAM)c,(LPARAM)ch);
             if (c->curtextcol) buttonFg=c->curtextcol;
             else if (isUpdate) buttonFg = [NSColor textColor]; // todo some other col?              
+            if (buttonFg) [buttonFg retain];
+
             SWELL_DeleteGfxContext((HDC)c);
           }
         }
@@ -152,7 +154,7 @@ void SWELL_DoDialogColorUpdates(HWND hwnd, DLGPROC d, bool isUpdate)
         if (!isbox && [(NSTextField *)ch isEditable])
         {
 #if 0 // no color overrides for editable text fields
-          if (!(had_flags&2))
+          if (!editFg && !editBg && !(had_flags&2))
           {
             had_flags|=2;
             HDC__ *c = SWELL_GDP_CTX_NEW();
@@ -169,6 +171,8 @@ void SWELL_DoDialogColorUpdates(HWND hwnd, DLGPROC d, bool isUpdate)
                 editFg = [NSColor textColor]; 
                 editBg = [NSColor textBackgroundColor];
               }
+              if (editFg) [editFg retain];
+              if (editBg) [editBg retain];
               SWELL_DeleteGfxContext((HDC)c);
             }
           }
@@ -178,7 +182,7 @@ void SWELL_DoDialogColorUpdates(HWND hwnd, DLGPROC d, bool isUpdate)
         }
         else // isbox or noneditable
         {
-          if (!(had_flags&1))
+          if (!staticFg && !(had_flags&1))
           {
             had_flags|=1;
             HDC__ *c = SWELL_GDP_CTX_NEW();
@@ -190,6 +194,7 @@ void SWELL_DoDialogColorUpdates(HWND hwnd, DLGPROC d, bool isUpdate)
               {
                 staticFg = [NSColor textColor]; 
               }
+              if (staticFg) [staticFg retain];
               SWELL_DeleteGfxContext((HDC)c);
             }
           }
@@ -209,6 +214,10 @@ void SWELL_DoDialogColorUpdates(HWND hwnd, DLGPROC d, bool isUpdate)
       }  //nstextfield
     } // child
   }     // children
+  if (buttonFg) [buttonFg release];
+  if (staticFg) [staticFg release];
+  if (editFg) [editFg release];
+  if (editBg) [editBg release];
 }  
 
 static LRESULT SwellDialogDefaultWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -2755,7 +2764,7 @@ void swellRenderOptimizely(int passflags, SWELL_hwndChild *view, HDC hdc, BOOL d
     [sv retain];
     int x,n=[sv count];
     HBRUSH bgbr=0;
-    bool bgbr_checked=false;
+    bool bgbr_valid=false;
     for(x=0;x<n;x++)
     {
       NSView *v = (NSView *)[sv objectAtIndex:x];
@@ -2774,6 +2783,7 @@ void swellRenderOptimizely(int passflags, SWELL_hwndChild *view, HDC hdc, BOOL d
             swellRenderOptimizely(passflags,(SWELL_hwndChild*)v,hdc,doforce,needdraws,rlist,rlistcnt,draw_xlate_x-(int)fr.origin.x,draw_xlate_y-(int)fr.origin.y,false);
             CGContextRestoreGState(hdc->ctx);
             if (passflags&2) [v setNeedsDisplay:NO];
+            bgbr_valid=false; // code in swellRenderOptimizely() may trigger WM_CTLCOLORDLG which may invalidate our brush, so clear the cached value here
           }
           else if (passflags&1)
           {
@@ -2795,10 +2805,10 @@ void swellRenderOptimizely(int passflags, SWELL_hwndChild *view, HDC hdc, BOOL d
               NSRect fr=  [v frame];
               
               // we could recursively go up looking for WM_CTLCOLORDLG, but actually we just need to use the current window            
-              if (!bgbr_checked)
+              if (!bgbr_valid) // note that any code in this loop that does anything that could trigger messages might invalidate bgbr, so it should clear bgbr_checked here
               {
                 bgbr=(HGDIOBJ)SendMessage((HWND)view,WM_CTLCOLORDLG,(WPARAM)hdc,(LPARAM)view);
-                bgbr_checked=true;
+                bgbr_valid=true;
               }
                    
               if (!iscv) fr = [view convertRect:fr toView:[[view window] contentView]];
@@ -2820,7 +2830,7 @@ void swellRenderOptimizely(int passflags, SWELL_hwndChild *view, HDC hdc, BOOL d
                   r.right+=draw_xlate_x;
                   r.top+=draw_xlate_y;
                   r.bottom+=draw_xlate_y;
-                  if (bgbr &&  bgbr != (HBRUSH)1) FillRect(hdc,&r,bgbr);
+                  if (bgbr_valid && bgbr &&  bgbr != (HBRUSH)1) FillRect(hdc,&r,bgbr);
                   else SWELL_FillDialogBackground(hdc,&r,3);
                 }
               }
