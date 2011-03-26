@@ -35,8 +35,8 @@ typedef union { float fl; unsigned int w; } WDL_DenormalFloatAccess;
 #define WDL_NOT_DENORMAL_DOUBLE(a) (WDL_DENORMAL_DOUBLE_HW(a)&0x7ff00000)
 #define WDL_NOT_DENORMAL_FLOAT(a) (WDL_DENORMAL_FLOAT_W(a)&0x7f800000)
 
-#define WDL_IS_DENORMAL_DOUBLE(a) (!WDL_NOT_DENORMAL_DOUBLE(a))
-#define WDL_IS_DENORMAL_FLOAT(a) (!WDL_NOT_DENORMAL_FLOAT(a))
+#define WDL_DENORMAL_OR_ZERO_DOUBLE(a) (!WDL_NOT_DENORMAL_DOUBLE(a))
+#define WDL_DENORMAL_OR_ZERO_FLOAT(a) (!WDL_NOT_DENORMAL_FLOAT(a))
 
 static double WDL_DENORMAL_INLINE denormal_filter_double(double a)
 {
@@ -50,16 +50,13 @@ static float WDL_DENORMAL_INLINE denormal_filter_float(float a)
 
 static void WDL_DENORMAL_INLINE denormal_fix_double(double *a)
 {
-  if (WDL_IS_DENORMAL_DOUBLE(a)) *a=0.0;
+  if (WDL_DENORMAL_OR_ZERO_DOUBLE(a)) *a=0.0;
 }
 
 static void WDL_DENORMAL_INLINE denormal_fix_float(float *a)
 {
-  if (WDL_IS_DENORMAL_FLOAT(a)) *a=0.0f;
+  if (WDL_DENORMAL_OR_ZERO_FLOAT(a)) *a=0.0f;
 }
-
-#define is_denormal_double(a) WDL_IS_DENORMAL_DOUBLE(&a)
-#define is_denormal_float(a) WDL_IS_DENORMAL_FLOAT(&a)
 
 
 
@@ -78,21 +75,21 @@ static float WDL_DENORMAL_INLINE denormal_filter(float a)
 
 static void WDL_DENORMAL_INLINE denormal_fix(double *a)
 {
-  if (WDL_IS_DENORMAL_DOUBLE(a)) *a=0.0;
+  if (WDL_DENORMAL_OR_ZERO_DOUBLE(a)) *a=0.0;
 }
 static void WDL_DENORMAL_INLINE denormal_fix(float *a)
 {
-  if (WDL_IS_DENORMAL_FLOAT(a)) *a=0.0f;
+  if (WDL_DENORMAL_OR_ZERO_FLOAT(a)) *a=0.0f;
 }
 
-static bool WDL_DENORMAL_INLINE is_denormal(double a)
+static bool WDL_DENORMAL_INLINE WDL_DENORMAL_OR_ZERO(double *a)
 {
-  return WDL_IS_DENORMAL_DOUBLE(&a);
+  return WDL_DENORMAL_OR_ZERO_DOUBLE(&a);
 }
 
-static bool WDL_DENORMAL_INLINE is_denormal(float a)
+static bool WDL_DENORMAL_INLINE WDL_DENORMAL_OR_ZERO(float *a)
 {
-  return WDL_IS_DENORMAL_FLOAT(&a);
+  return WDL_DENORMAL_OR_ZERO_FLOAT(&a);
 }
 
 
