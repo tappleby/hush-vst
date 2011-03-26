@@ -95,8 +95,11 @@
 
 
 #include <math.h>
-#include <string.h>
+#ifdef _MSC_VER
+#pragma warning(disable:4996) // hypot
+#endif
 
+#include <string.h>
 #include <assert.h>
 
 #include "wdltypes.h"
@@ -186,7 +189,7 @@ public:
 		complex gain = 0.;
 		for (int i = order; i >= 0; --i) gain = add(gain, coeffs[i]);
 		gain = inverse(gain);
-		mCoeffs[0] = 1./_hypot(gain.im, gain.re);
+		mCoeffs[0] = 1./hypot(gain.im, gain.re);
 		for (int i = 1, j = order - 1; i <= order; ++i, --j) mCoeffs[i] = -(coeffs[j].re / coeffs[order].re);
 	}
 
