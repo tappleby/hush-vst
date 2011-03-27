@@ -247,6 +247,46 @@ static WDL_ENDIAN_INLINE WDL_UINT64 WDL_bswap64(const WDL_UINT64 int64)
 #endif // WDL_ftoleXX et al
 
 
+// Wrappers that convert the variable in-place, or generate no code if
+// converson is not necessary.
+
+// Beware to only feed variables to these macros, so no fancy things like
+// WDL_HTOLE32(x+y) or WDL_HTOLE32(x++). Note that these macros are only
+// available for integer data types, not for floating points. Note also that
+// these macros only change the type to unsigned if conversion is actually
+// necessary.
+
+#ifdef WDL_LITTLE_ENDIAN
+#define WDL_HTOLE16(x) ((void)0)
+#define WDL_HTOLE32(x) ((void)0)
+#define WDL_HTOLE64(x) ((void)0)
+#define WDL_LE16TOH(x) ((void)0)
+#define WDL_LE32TOH(x) ((void)0)
+#define WDL_LE64TOH(x) ((void)0)
+#define WDL_HTOBE16(x) (x = WDL_htobe16(x))
+#define WDL_HTOBE32(x) (x = WDL_htobe32(x))
+#define WDL_HTOBE64(x) (x = WDL_htobe64(x))
+#define WDL_BE16TOH(x) (x = WDL_be16toh(x))
+#define WDL_BE32TOH(x) (x = WDL_be32toh(x))
+#define WDL_BE64TOH(x) (x = WDL_be64toh(x))
+
+#elif defined(WDL_BIG_ENDIAN)
+#define WDL_HTOBE16(x) ((void)0)
+#define WDL_HTOBE32(x) ((void)0)
+#define WDL_HTOBE64(x) ((void)0)
+#define WDL_BE16TOH(x) ((void)0)
+#define WDL_BE32TOH(x) ((void)0)
+#define WDL_BE64TOH(x) ((void)0)
+#define WDL_HTOLE16(x) (x = WDL_htole16(x))
+#define WDL_HTOLE32(x) (x = WDL_htole32(x))
+#define WDL_HTOLE64(x) (x = WDL_htole64(x))
+#define WDL_LE16TOH(x) (x = WDL_le16toh(x))
+#define WDL_LE32TOH(x) (x = WDL_le32toh(x))
+#define WDL_LE64TOH(x) (x = WDL_le64toh(x))
+
+#endif // WDL_HTOLExx et al
+
+
 // C++ auto-typed wrappers
 #ifdef __cplusplus
 
@@ -289,6 +329,21 @@ static WDL_ENDIAN_INLINE WDL_UINT64 WDL_bswap64(const WDL_UINT64 int64)
 
 	static WDL_ENDIAN_INLINE float          WDL_betof(unsigned int   big32)    { return WDL_be32tof(big32); }
 	static WDL_ENDIAN_INLINE double         WDL_betof(WDL_UINT64     big64)    { return WDL_be64tof(big64); }
+
+	// Auto-typed in-place wrappers (see remarks above).
+	#ifdef WDL_LITTLE_ENDIAN
+	#define WDL_HTOLE(x) ((void)0)
+	#define WDL_LETOH(x) ((void)0)
+	#define WDL_HTOBE(x) (x = WDL_htobe(x))
+	#define WDL_BETOH(x) (x = WDL_betoh(x))
+
+	#elif WDL_BIG_ENDIAN
+	#define WDL_HTOBE(x) ((void)0)
+	#define WDL_BETOH(x) ((void)0)
+	#define WDL_HTOLE(x) (x = WDL_htole(x))
+	#define WDL_LETOH(x) (x = WDL_letoh(x))
+
+	#endif // WDL_HTOLE et al
 
 #endif // __cplusplus
 
