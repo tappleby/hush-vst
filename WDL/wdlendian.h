@@ -56,8 +56,8 @@
 	#error Unknown endian
 #endif
 
-// GNU C
-#elif defined(__BYTE_ORDER__)
+// GNU C (v4.6 or later?)
+#elif __GNUC__ && defined(__BYTE_ORDER__)
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 	#define WDL_LITTLE_ENDIAN
 #elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
@@ -68,6 +68,14 @@
 #if __FLOAT_WORD_ORDER__ != __BYTE_ORDER__
 	#error Unsupported float endian
 #endif
+
+// GNU C, Intel C++
+#elif defined(__i386) || defined(__i386__) || defined(i386)
+#define WDL_LITTLE_ENDIAN
+
+// Intel C++
+#elif defined(__x86_64) || defined(__x86_64__)
+#define WDL_LITTLE_ENDIAN
 
 #else
 #error Unknown endian
@@ -94,11 +102,11 @@
 #define WDL_bswap64(x) __builtin_bswap64(x)
 
 // Linux
-//#elif defined(__linux)
-//#include <sys/endian.h>
-//#define WDL_bswap16(x) bswap16(x)
-//#define WDL_bswap32(x) bswap32(x)
-//#define WDL_bswap64(x) bswap64(x)
+#elif defined(__linux) || defined(__linux__) || defined(linux)
+#include <endian.h>
+#define WDL_bswap16(x) bswap16(x)
+#define WDL_bswap32(x) bswap32(x)
+#define WDL_bswap64(x) bswap64(x)
 
 #endif // WDL_bswapXX
 
@@ -153,19 +161,19 @@ static WDL_ENDIAN_INLINE WDL_UINT64 WDL_bswap64(const WDL_UINT64 int64)
 #define WDL_be64toh(x) EndianU64_BtoN(x)
 
 // Linux
-//#elif defined(__linux)
-//#define WDL_htole16(x) htole16(x)
-//#define WDL_htole32(x) htole32(x)
-//#define WDL_htole64(x) htole64(x)
-//#define WDL_le16toh(x) le16toh(x)
-//#define WDL_le32toh(x) le32toh(x)
-//#define WDL_le64toh(x) le64toh(x)
-//#define WDL_htobe16(x) htobe16(x)
-//#define WDL_htobe32(x) htobe32(x)
-//#define WDL_htobe64(x) htobe64(x)
-//#define WDL_be16toh(x) be16toh(x)
-//#define WDL_be32toh(x) be32toh(x)
-//#define WDL_be64toh(x) be64toh(x)
+#elif defined(__linux) || defined(__linux__) || defined(linux)
+#define WDL_htole16(x) htole16(x)
+#define WDL_htole32(x) htole32(x)
+#define WDL_htole64(x) htole64(x)
+#define WDL_le16toh(x) le16toh(x)
+#define WDL_le32toh(x) le32toh(x)
+#define WDL_le64toh(x) le64toh(x)
+#define WDL_htobe16(x) htobe16(x)
+#define WDL_htobe32(x) htobe32(x)
+#define WDL_htobe64(x) htobe64(x)
+#define WDL_be16toh(x) be16toh(x)
+#define WDL_be32toh(x) be32toh(x)
+#define WDL_be64toh(x) be64toh(x)
 
 // Generic little-endian
 #elif defined(WDL_LITTLE_ENDIAN)
