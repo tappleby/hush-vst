@@ -33,6 +33,9 @@
 
 #include "wdltypes.h"
 
+typedef union { float  f; unsigned int int32; } WDL_EndianFloat;
+typedef union { double f; WDL_UINT64   int64; } WDL_EndianDouble;
+
 #ifdef __cplusplus
 	#define WDL_ENDIAN_INLINE inline
 #elif defined(_MSC_VER)
@@ -145,213 +148,109 @@ static WDL_ENDIAN_INLINE WDL_UINT64 WDL_bswap64(const WDL_UINT64 int64)
 #endif
 
 
-// Mac OS X
-#if defined(__APPLE__)
-#define WDL_htole16(x) EndianU16_NtoL(x)
-#define WDL_htole32(x) EndianU32_NtoL(x)
-#define WDL_htole64(x) EndianU64_NtoL(x)
-#define WDL_le16toh(x) EndianU16_LtoN(x)
-#define WDL_le32toh(x) EndianU32_LtoN(x)
-#define WDL_le64toh(x) EndianU64_LtoN(x)
-#define WDL_htobe16(x) EndianU16_NtoB(x)
-#define WDL_htobe32(x) EndianU32_NtoB(x)
-#define WDL_htobe64(x) EndianU64_NtoB(x)
-#define WDL_be16toh(x) EndianU16_BtoN(x)
-#define WDL_be32toh(x) EndianU32_BtoN(x)
-#define WDL_be64toh(x) EndianU64_BtoN(x)
+// Int types
 
-// Linux
-#elif defined(__linux) || defined(__linux__) || defined(linux)
-#define WDL_htole16(x) htole16(x)
-#define WDL_htole32(x) htole32(x)
-#define WDL_htole64(x) htole64(x)
-#define WDL_le16toh(x) le16toh(x)
-#define WDL_le32toh(x) le32toh(x)
-#define WDL_le64toh(x) le64toh(x)
-#define WDL_htobe16(x) htobe16(x)
-#define WDL_htobe32(x) htobe32(x)
-#define WDL_htobe64(x) htobe64(x)
-#define WDL_be16toh(x) be16toh(x)
-#define WDL_be32toh(x) be32toh(x)
-#define WDL_be64toh(x) be64toh(x)
+#if defined(WDL_LITTLE_ENDIAN)
 
-// Generic little-endian
-#elif defined(WDL_LITTLE_ENDIAN)
-#define WDL_htole16(x) ((unsigned short)(x))
-#define WDL_htole32(x) ((unsigned int)(x))
-#define WDL_htole64(x) ((WDL_UINT64)(x))
-#define WDL_le16toh(x) ((unsigned short)(x))
-#define WDL_le32toh(x) ((unsigned int)(x))
-#define WDL_le64toh(x) ((WDL_UINT64)(x))
-#define WDL_htobe16(x) WDL_bswap16(x)
-#define WDL_htobe32(x) WDL_bswap32(x)
-#define WDL_htobe64(x) WDL_bswap64(x)
-#define WDL_be16toh(x) WDL_bswap16(x)
-#define WDL_be32toh(x) WDL_bswap32(x)
-#define WDL_be64toh(x) WDL_bswap64(x)
+	#define WDL_bswap16_if_le(x) ((unsigned short)(x))
+	#define WDL_bswap32_if_le(x) ((unsigned int)(x))
+	#define WDL_bswap64_if_le(x) ((WDL_UINT64)(x))
+	#define WDL_bswap16_if_be(x) WDL_bswap16(x)
+	#define WDL_bswap32_if_be(x) WDL_bswap32(x)
+	#define WDL_bswap64_if_be(x) WDL_bswap64(x)
 
-// Generic big-endian
-#elif defined(WDL_BIG_ENDIAN)
-#define WDL_htobe16(x) ((unsigned short)(x))
-#define WDL_htobe32(x) ((unsigned int)(x))
-#define WDL_htobe64(x) ((WDL_UINT64)(x))
-#define WDL_be16toh(x) ((unsigned short)(x))
-#define WDL_be32toh(x) ((unsigned int)(x))
-#define WDL_be64toh(x) ((WDL_UINT64)(x))
-#define WDL_htole16(x) WDL_bswap16(x)
-#define WDL_htole32(x) WDL_bswap32(x)
-#define WDL_htole64(x) WDL_bswap64(x)
-#define WDL_le16toh(x) WDL_bswap16(x)
-#define WDL_le32toh(x) WDL_bswap32(x)
-#define WDL_le64toh(x) WDL_bswap64(x)
+	// Wrappers that convert a variable in-place, or generate no code if
+	// conversion is not necessary. Beware to only feed variables to these
+	// macros, so no fancy things like WDL_BSWAP32_IF_LE(x + y) or
+	// WDL_BSWAP32_IF_LE(x++). Note that these macros only change the type
+	// to unsigned if conversion is actually necessary.
+	#define WDL_BSWAP16_IF_LE(x) ((void)0)
+	#define WDL_BSWAP32_IF_LE(x) ((void)0)
+	#define WDL_BSWAP64_IF_LE(x) ((void)0)
+	#define WDL_BSWAP16_IF_BE(x) (x = WDL_bswap16(x))
+	#define WDL_BSWAP32_IF_BE(x) (x = WDL_bswap32(x))
+	#define WDL_BSWAP64_IF_BE(x) (x = WDL_bswap64(x))
 
-#endif // WDL_htoleXX et al
+#else // #elif defined(WDL_BIG_ENDIAN)
+
+	#define WDL_bswap16_if_be(x) ((unsigned short)(x))
+	#define WDL_bswap32_if_be(x) ((unsigned int)(x))
+	#define WDL_bswap64_if_be(x) ((WDL_UINT64)(x))
+	#define WDL_bswap16_if_le(x) WDL_bswap16(x)
+	#define WDL_bswap32_if_le(x) WDL_bswap32(x)
+	#define WDL_bswap64_if_le(x) WDL_bswap64(x)
+
+	// In-place wrappers (see notes above)
+	#define WDL_BSWAP16_IF_BE(x) ((void)0)
+	#define WDL_BSWAP32_IF_BE(x) ((void)0)
+	#define WDL_BSWAP64_IF_BE(x) ((void)0)
+	#define WDL_BSWAP16_IF_LE(x) (x = WDL_bswap16(x))
+	#define WDL_BSWAP32_IF_LE(x) (x = WDL_bswap32(x))
+	#define WDL_BSWAP64_IF_LE(x) (x = WDL_bswap64(x))
+
+#endif // WDL_bswapXX_if_YY
+
+
+// C++ auto-typed wrappers
+
+#ifdef __cplusplus
+
+static WDL_ENDIAN_INLINE unsigned short WDL_bswap_if_le(unsigned short int16) { return WDL_bswap16_if_le(int16); }
+static WDL_ENDIAN_INLINE signed   short WDL_bswap_if_le(signed   short int16) { return WDL_bswap16_if_le(int16); }
+static WDL_ENDIAN_INLINE unsigned int   WDL_bswap_if_le(unsigned int   int32) { return WDL_bswap32_if_le(int32); }
+static WDL_ENDIAN_INLINE signed   int   WDL_bswap_if_le(signed   int   int32) { return WDL_bswap32_if_le(int32); }
+static WDL_ENDIAN_INLINE WDL_UINT64     WDL_bswap_if_le(WDL_UINT64     int64) { return WDL_bswap64_if_le(int64); }
+static WDL_ENDIAN_INLINE WDL_INT64      WDL_bswap_if_le(WDL_INT64      int64) { return WDL_bswap64_if_le(int64); }
+
+static WDL_ENDIAN_INLINE unsigned short WDL_bswap_if_be(unsigned short int16) { return WDL_bswap16_if_be(int16); }
+static WDL_ENDIAN_INLINE signed   short WDL_bswap_if_be(signed   short int16) { return WDL_bswap16_if_be(int16); }
+static WDL_ENDIAN_INLINE unsigned int   WDL_bswap_if_be(unsigned int   int32) { return WDL_bswap32_if_be(int32); }
+static WDL_ENDIAN_INLINE signed   int   WDL_bswap_if_be(signed   int   int32) { return WDL_bswap32_if_be(int32); }
+static WDL_ENDIAN_INLINE WDL_UINT64     WDL_bswap_if_be(WDL_UINT64     int64) { return WDL_bswap64_if_be(int64); }
+static WDL_ENDIAN_INLINE WDL_INT64      WDL_bswap_if_be(WDL_INT64      int64) { return WDL_bswap64_if_be(int64); }
+
+// Auto-typed in-place wrappers (see notes above)
+#ifdef WDL_LITTLE_ENDIAN
+	#define WDL_BSWAP_IF_LE(x) ((void)0)
+	#define WDL_BSWAP_IF_BE(x) (x = WDL_bswap_if_be(x))
+#else // #elif defined(WDL_BIG_ENDIAN)
+	#define WDL_BSWAP_IF_BE(x) ((void)0)
+	#define WDL_BSWAP_IF_LE(x) (x = WDL_bswap_if_le(x))
+#endif
 
 
 // Map floating point types to int types.
 
-#ifdef WDL_LITTLE_ENDIAN
+#if defined(WDL_LITTLE_ENDIAN)
+	#define __WDL_bswapf_if_a WDL_bswapf_if_le
+	#define __WDL_bswapf_if_b WDL_bswapf_if_be
+#else // #elif defined(WDL_BIG_ENDIAN)
+	#define __WDL_bswapf_if_a WDL_bswapf_if_be
+	#define __WDL_bswapf_if_b WDL_bswapf_if_le
+#endif
 
-	static WDL_ENDIAN_INLINE unsigned int WDL_ftole32(const float        host32)   { return *(const unsigned int*)&host32; }
-	static WDL_ENDIAN_INLINE WDL_UINT64   WDL_ftole64(const double       host64)   { return *(const WDL_UINT64  *)&host64; }
-	static WDL_ENDIAN_INLINE float        WDL_le32tof(const unsigned int little32) { return *(const float       *)&little32; }
-	static WDL_ENDIAN_INLINE double       WDL_le64tof(const WDL_UINT64   little64) { return *(const double      *)&little64; }
-	static WDL_ENDIAN_INLINE unsigned int WDL_ftobe32(const float        host32)   { return WDL_htobe32(*(const unsigned int*)&host32); }
-	static WDL_ENDIAN_INLINE WDL_UINT64   WDL_ftobe64(const double       host64)   { return WDL_htobe64(*(const WDL_UINT64  *)&host64); }
+static WDL_ENDIAN_INLINE unsigned int __WDL_bswapf_if_a(const float        f)     { return *(const unsigned int*)&f; }
+static WDL_ENDIAN_INLINE WDL_UINT64   __WDL_bswapf_if_a(const double       f)     { return *(const WDL_UINT64  *)&f; }
+static WDL_ENDIAN_INLINE float        __WDL_bswapf_if_a(const unsigned int int32) { return *(const float       *)&int32; }
+static WDL_ENDIAN_INLINE double       __WDL_bswapf_if_a(const WDL_UINT64   int64) { return *(const double      *)&int64; }
 
-	static WDL_ENDIAN_INLINE float WDL_be32tof(const unsigned int big32)
-	{
-		const unsigned int host32 = WDL_be32toh(big32);
-		return *(const float*)&host32;
-	}
+static WDL_ENDIAN_INLINE unsigned int __WDL_bswapf_if_b(const float        f)     { return WDL_bswap32(*(const unsigned int*)&f); }
+static WDL_ENDIAN_INLINE WDL_UINT64   __WDL_bswapf_if_b(const double       f)     { return WDL_bswap64(*(const WDL_UINT64  *)&f); }
 
-	static WDL_ENDIAN_INLINE double WDL_be64tof(const WDL_UINT64 big64)
-	{
-		const WDL_UINT64 host64 = WDL_be64toh(big64);
-		return *(const double*)&host64;
-	}
+static WDL_ENDIAN_INLINE float        __WDL_bswapf_if_b(const unsigned int int32)
+{
+	const unsigned int i = WDL_bswap32(int32);
+	return *(const float*)&i;
+}
 
-#elif defined(WDL_BIG_ENDIAN)
+static WDL_ENDIAN_INLINE double       __WDL_bswapf_if_b(const WDL_UINT64   int64)
+{
+	const WDL_UINT64 i = WDL_bswap64(int64);
+	return *(const double*)&i;
+}
 
-	static WDL_ENDIAN_INLINE unsigned int WDL_ftobe32(const float        host32) { return *(const unsigned int*)&host32; }
-	static WDL_ENDIAN_INLINE WDL_UINT64   WDL_ftobe64(const double       host64) { return *(const WDL_UINT64  *)&host64; }
-	static WDL_ENDIAN_INLINE float        WDL_be32tof(const unsigned int big32)  { return *(const float       *)&big32; }
-	static WDL_ENDIAN_INLINE double       WDL_be64tof(const WDL_UINT64   big64)  { return *(const double      *)&big64; }
-	static WDL_ENDIAN_INLINE unsigned int WDL_ftole32(const float        host32) { return WDL_htole32(*(const unsigned int*)&host32); }
-	static WDL_ENDIAN_INLINE WDL_UINT64   WDL_ftole64(const double       host64) { return WDL_htole64(*(const WDL_UINT64  *)&host64); }
-
-	static WDL_ENDIAN_INLINE float WDL_le32tof(const unsigned int little32)
-	{
-		const unsigned int host32 = WDL_le32toh(little32);
-		return *(const float*)&host32;
-	}
-
-	static WDL_ENDIAN_INLINE double WDL_le64tof(const WDL_UINT64 little64)
-	{
-		const WDL_UINT64 host64 = WDL_le64toh(little64);
-		return *(const double*)&host64;
-	}
-
-#endif // WDL_ftoleXX et al
-
-
-// Wrappers that convert the variable in-place, or generate no code if
-// converson is not necessary.
-
-// Beware to only feed variables to these macros, so no fancy things like
-// WDL_HTOLE32(x+y) or WDL_HTOLE32(x++). Note that these macros are only
-// available for integer data types, not for floating points. Note also that
-// these macros only change the type to unsigned if conversion is actually
-// necessary.
-
-#ifdef WDL_LITTLE_ENDIAN
-#define WDL_HTOLE16(x) ((void)0)
-#define WDL_HTOLE32(x) ((void)0)
-#define WDL_HTOLE64(x) ((void)0)
-#define WDL_LE16TOH(x) ((void)0)
-#define WDL_LE32TOH(x) ((void)0)
-#define WDL_LE64TOH(x) ((void)0)
-#define WDL_HTOBE16(x) (x = WDL_htobe16(x))
-#define WDL_HTOBE32(x) (x = WDL_htobe32(x))
-#define WDL_HTOBE64(x) (x = WDL_htobe64(x))
-#define WDL_BE16TOH(x) (x = WDL_be16toh(x))
-#define WDL_BE32TOH(x) (x = WDL_be32toh(x))
-#define WDL_BE64TOH(x) (x = WDL_be64toh(x))
-
-#elif defined(WDL_BIG_ENDIAN)
-#define WDL_HTOBE16(x) ((void)0)
-#define WDL_HTOBE32(x) ((void)0)
-#define WDL_HTOBE64(x) ((void)0)
-#define WDL_BE16TOH(x) ((void)0)
-#define WDL_BE32TOH(x) ((void)0)
-#define WDL_BE64TOH(x) ((void)0)
-#define WDL_HTOLE16(x) (x = WDL_htole16(x))
-#define WDL_HTOLE32(x) (x = WDL_htole32(x))
-#define WDL_HTOLE64(x) (x = WDL_htole64(x))
-#define WDL_LE16TOH(x) (x = WDL_le16toh(x))
-#define WDL_LE32TOH(x) (x = WDL_le32toh(x))
-#define WDL_LE64TOH(x) (x = WDL_le64toh(x))
-
-#endif // WDL_HTOLExx et al
-
-
-// C++ auto-typed wrappers
-#ifdef __cplusplus
-
-	static WDL_ENDIAN_INLINE unsigned short WDL_htole(unsigned short host16)   { return WDL_htole16(host16); }
-	static WDL_ENDIAN_INLINE signed   short WDL_htole(signed   short host16)   { return WDL_htole16(host16); }
-	static WDL_ENDIAN_INLINE unsigned int   WDL_htole(unsigned int   host32)   { return WDL_htole32(host32); }
-	static WDL_ENDIAN_INLINE signed   int   WDL_htole(signed   int   host32)   { return WDL_htole32(host32); }
-	static WDL_ENDIAN_INLINE WDL_UINT64     WDL_htole(WDL_UINT64     host64)   { return WDL_htole64(host64); }
-	static WDL_ENDIAN_INLINE WDL_INT64      WDL_htole(WDL_INT64      host64)   { return WDL_htole64(host64); }
-
-	static WDL_ENDIAN_INLINE unsigned int   WDL_ftole(float          host32)   { return WDL_ftole32(host32); }
-	static WDL_ENDIAN_INLINE WDL_UINT64     WDL_ftole(double         host64)   { return WDL_ftole64(host64); }
-
-	static WDL_ENDIAN_INLINE unsigned short WDL_letoh(unsigned short little16) { return WDL_le16toh(little16); }
-	static WDL_ENDIAN_INLINE signed   short WDL_letoh(signed   short little16) { return WDL_le16toh(little16); }
-	static WDL_ENDIAN_INLINE unsigned int   WDL_letoh(unsigned int   little32) { return WDL_le32toh(little32); }
-	static WDL_ENDIAN_INLINE signed   int   WDL_letoh(signed   int   little32) { return WDL_le32toh(little32); }
-	static WDL_ENDIAN_INLINE WDL_UINT64     WDL_letoh(WDL_UINT64     little64) { return WDL_le64toh(little64); }
-	static WDL_ENDIAN_INLINE WDL_INT64      WDL_letoh(WDL_INT64      little64) { return WDL_le64toh(little64); }
-
-	static WDL_ENDIAN_INLINE float          WDL_letof(unsigned int   little32) { return WDL_le32tof(little32); }
-	static WDL_ENDIAN_INLINE double         WDL_letof(WDL_UINT64     little64) { return WDL_le64tof(little64); }
-
-	static WDL_ENDIAN_INLINE unsigned short WDL_htobe(unsigned short host16)   { return WDL_htobe16(host16); }
-	static WDL_ENDIAN_INLINE signed   short WDL_htobe(signed   short host16)   { return WDL_htobe16(host16); }
-	static WDL_ENDIAN_INLINE unsigned int   WDL_htobe(unsigned int   host32)   { return WDL_htobe32(host32); }
-	static WDL_ENDIAN_INLINE signed   int   WDL_htobe(signed   int   host32)   { return WDL_htobe32(host32); }
-	static WDL_ENDIAN_INLINE WDL_UINT64     WDL_htobe(WDL_UINT64     host64)   { return WDL_htobe64(host64); }
-	static WDL_ENDIAN_INLINE WDL_INT64      WDL_htobe(WDL_INT64      host64)   { return WDL_htobe64(host64); }
-
-	static WDL_ENDIAN_INLINE unsigned int   WDL_ftobe(float          host32)   { return WDL_ftobe32(host32); }
-	static WDL_ENDIAN_INLINE WDL_UINT64     WDL_ftobe(double         host64)   { return WDL_ftobe64(host64); }
-
-	static WDL_ENDIAN_INLINE unsigned short WDL_betoh(unsigned short big16)    { return WDL_be16toh(big16); }
-	static WDL_ENDIAN_INLINE signed   short WDL_betoh(signed   short big16)    { return WDL_be16toh(big16); }
-	static WDL_ENDIAN_INLINE unsigned int   WDL_betoh(unsigned int   big32)    { return WDL_be32toh(big32); }
-	static WDL_ENDIAN_INLINE signed   int   WDL_betoh(signed   int   big32)    { return WDL_be32toh(big32); }
-	static WDL_ENDIAN_INLINE WDL_UINT64     WDL_betoh(WDL_UINT64     big64)    { return WDL_be64toh(big64); }
-	static WDL_ENDIAN_INLINE WDL_INT64      WDL_betoh(WDL_INT64      big64)    { return WDL_be64toh(big64); }
-
-	static WDL_ENDIAN_INLINE float          WDL_betof(unsigned int   big32)    { return WDL_be32tof(big32); }
-	static WDL_ENDIAN_INLINE double         WDL_betof(WDL_UINT64     big64)    { return WDL_be64tof(big64); }
-
-	// Auto-typed in-place wrappers (see remarks above).
-	#ifdef WDL_LITTLE_ENDIAN
-	#define WDL_HTOLE(x) ((void)0)
-	#define WDL_LETOH(x) ((void)0)
-	#define WDL_HTOBE(x) (x = WDL_htobe(x))
-	#define WDL_BETOH(x) (x = WDL_betoh(x))
-
-	#elif WDL_BIG_ENDIAN
-	#define WDL_HTOBE(x) ((void)0)
-	#define WDL_BETOH(x) ((void)0)
-	#define WDL_HTOLE(x) (x = WDL_htole(x))
-	#define WDL_LETOH(x) (x = WDL_letoh(x))
-
-	#endif // WDL_HTOLE et al
+#undef __WDL_bswapf_if_a
+#undef __WDL_bswapf_if_b
 
 #endif // __cplusplus
 
