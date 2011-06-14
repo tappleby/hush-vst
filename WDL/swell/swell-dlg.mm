@@ -23,6 +23,7 @@ bool SWELL_owned_windows_levelincrease=false;
 
 #include "swell-internal.h"
 
+extern int g_swell_terminating;
 
 static BOOL useNoMiddleManCocoa()
 {
@@ -36,6 +37,21 @@ static BOOL useNoMiddleManCocoa()
   return is105>0;
 }
 
+void updateWindowCollection(NSWindow *w)
+{
+  static SInt32 ver;
+  if (!ver)
+  {
+    Gestalt(gestaltSystemVersion,&ver);
+    if (!ver) ver=0x1040;
+  }
+  if (ver>=0x1060)
+  {
+    const int NSWindowCollectionBehaviorParticipatesInCycle = 1 << 5;
+    const int  NSWindowCollectionBehaviorManaged = 1 << 2;
+    [w setCollectionBehavior:NSWindowCollectionBehaviorManaged|NSWindowCollectionBehaviorParticipatesInCycle];
+  }
+}
 
 static void DrawSwellViewRectImpl(SWELL_hwndChild *view, NSRect rect, HDC hdc);
 static void swellRenderOptimizely(int passflags, SWELL_hwndChild *view, HDC hdc, BOOL doforce, WDL_PtrList<void> *needdraws, const NSRect *rlist, int rlistcnt, int draw_xlate_x, int draw_xlate_y, bool iscv);
@@ -416,7 +432,7 @@ static int DelegateMouseMove(NSView *view, NSEvent *theEvent)
     
     if (m_menu) 
     {
-      if ((HMENU)[NSApp mainMenu] == m_menu) [NSApp setMainMenu:nil];
+      if ((HMENU)[NSApp mainMenu] == m_menu && !g_swell_terminating) [NSApp setMainMenu:nil];
       [(NSMenu *)m_menu release]; 
       m_menu=0;
     }
@@ -735,8 +751,20 @@ static int DelegateMouseMove(NSView *view, NSEvent *theEvent)
   return TRUE;
 }
 
-- (BOOL)acceptsFirstMouse:(NSEvent *)theEvent {	return m_enabled?YES:NO; }
+- (BOOL)acceptsFirstMouse:(NSEvent *)theEvent
+{
+  if (m_enabled)
+  {
+    SendMessage((HWND)self, WM_MOUSEACTIVATE, 0, 0);
+    NSView* par=[self superview];
+    if (par) SendMessage((HWND)par, WM_MOUSEACTIVATE, 0, 0);
+    return YES;
+  }
+  return NO;
+}
+
 -(HMENU)swellGetMenu {   return m_menu; }
+-(BOOL)swellHasBeenDestroyed { return !!m_hashaddestroy; }
 -(void)swellSetMenu:(HMENU)menu {   m_menu=menu; }
 
 
@@ -748,6 +776,7 @@ static int DelegateMouseMove(NSView *view, NSEvent *theEvent)
   m_isdirty=3;
   m_glctx=NULL;
   m_enabled=TRUE;
+  m_lastTopLevelOwner=NULL;
   m_dlgproc=NULL;
   m_wndproc=NULL;
   m_userdata=0;
@@ -828,10 +857,37 @@ static int DelegateMouseMove(NSView *view, NSEvent *theEvent)
         if (v && [v acceptsFirstResponder]) hFoc=(HWND)v;
       }
     }
-    if (!isChild && hFoc) SetFocus(hFoc); // if not child window, set focus anyway
     
-    if (m_dlgproc((HWND)self,WM_INITDIALOG,(WPARAM)hFoc,par) && hFoc)
-      SetFocus(hFoc);
+    if (m_dlgproc((HWND)self,WM_INITDIALOG,(WPARAM)hFoc,par))
+    {
+      // set first responder to first item in window
+      if (hFoc) 
+      {
+        id wnd = [self window];
+        if (wnd && [wnd firstResponder] != (id)hFoc) [wnd makeFirstResponder:(id)hFoc];
+      }
+
+
+      if (parent && [(id)parent isKindOfClass:[SWELL_ModelessWindow class]] && ![(NSWindow *)parent isVisible])
+      {
+        // on win32, if you do CreateDialog(), WM_INITDIALOG(ret=1), then ShowWindow(SW_SHOWNA), you get the
+        // window brought to front. this simulates that, hackishly.
+        ((SWELL_ModelessWindow *)parent)->m_wantInitialKeyWindowOnShow = true;
+      }
+    }
+    else
+    {
+      // if top level dialog,always set default focus if it wasn't set
+      // if this causes problems, change NSWindow to be SWELL_ModalDialog, as that would
+      // only affect DialogBox() and not CreateDialog(), which might be preferable.
+      if (hFoc && parent && [(id)parent isKindOfClass:[NSWindow class]]) 
+      {
+        id fr = [(id)parent firstResponder];
+	if (!fr || fr == self || fr == (id)parent) [(id)parent makeFirstResponder:(id)hFoc];
+        
+      }
+    }
+    
     SWELL_DoDialogColorUpdates((HWND)self,m_dlgproc,false);
   }
   
@@ -1406,6 +1462,32 @@ static void MakeGestureInfo(NSEvent* evt, GESTUREINFO* gi, HWND hwnd, int type)
 // NSAccessibility
 
 
+- (id)accessibilityHitTest:(NSPoint)point
+{
+  id ret = NULL;
+  id use_obj = NULL;
+  SendMessage((HWND)self,WM_GETOBJECT,0x1001,(LPARAM)&use_obj);
+  if (use_obj)
+  {
+    ret = [use_obj accessibilityHitTest:point];
+    if (ret == use_obj && [ret accessibilityIsIgnored]) ret = NULL;
+  }
+
+  if (!ret) ret = [super accessibilityHitTest:point];
+  return ret;
+}
+- (id)accessibilityFocusedUIElement
+{
+  id use_obj = NULL, ret = NULL;
+  SendMessage((HWND)self,WM_GETOBJECT,0x1001,(LPARAM)&use_obj);
+  if (use_obj)
+  {
+    ret = [use_obj accessibilityFocusedUIElement];
+    if (ret == use_obj) ret=  NULL;
+  }
+  if (!ret) ret = [super accessibilityFocusedUIElement];
+  return ret;
+}
 
 - (id)accessibilityAttributeValue:(NSString *)attribute
 {
@@ -1514,13 +1596,17 @@ static HWND last_key_window;
 -(void)becomeKeyWindow \
 { \
   [super becomeKeyWindow]; \
-  HWND foc=last_key_window ? (HWND)[(NSWindow *)last_key_window contentView] : 0; \
-    HMENU menu=0; \
-      if ([[self contentView] respondsToSelector:@selector(swellGetMenu)]) \
-        menu = (HMENU) [[self contentView] swellGetMenu]; \
-          if (!menu) menu=ISMODAL && g_swell_defaultmenumodal ? g_swell_defaultmenumodal : g_swell_defaultmenu; \
-            if (menu && menu != (HMENU)[NSApp mainMenu])  [NSApp setMainMenu:(NSMenu *)menu]; \
-  [(SWELL_hwndChild*)[self contentView] onSwellMessage:WM_ACTIVATE p1:WA_ACTIVE p2:(LPARAM)foc]; \
+  NSView *foc=last_key_window && IsWindow(last_key_window) ? [(NSWindow *)last_key_window contentView] : 0; \
+  HMENU menu=0; \
+  if (foc && [foc respondsToSelector:@selector(swellHasBeenDestroyed)] && [foc swellHasBeenDestroyed]) foc=NULL; \
+  NSView *cv = [self contentView];  \
+  if (!cv || ![cv respondsToSelector:@selector(swellHasBeenDestroyed)] || ![cv swellHasBeenDestroyed])  { \
+    if ([cv respondsToSelector:@selector(swellGetMenu)]) menu = (HMENU) [cv swellGetMenu]; \
+    if (!menu) menu=ISMODAL && g_swell_defaultmenumodal ? g_swell_defaultmenumodal : g_swell_defaultmenu; \
+    if (menu && menu != (HMENU)[NSApp mainMenu] && !g_swell_terminating) [NSApp setMainMenu:(NSMenu *)menu]; \
+    [(SWELL_hwndChild*)cv onSwellMessage:WM_ACTIVATE p1:WA_ACTIVE p2:(LPARAM)foc]; \
+    [(SWELL_hwndChild*)cv onSwellMessage:WM_MOUSEACTIVATE p1:0 p2:0]; \
+  } \
 } \
 -(BOOL)windowShouldClose:(id)sender \
 { \
@@ -1545,7 +1631,7 @@ static HWND last_key_window;
     if (SWELL_owned_windows_levelincrease) if ([wnd isKindOfClass:[NSWindow class]]) \
     { \
       int extra = [wnd isKindOfClass:[SWELL_ModelessWindow class]] ? ((SWELL_ModelessWindow *)wnd)->m_wantraiseamt : 0; \
-      [wnd setLevel:[self level]+1+extra];  \
+      if ([NSApp isActive]) [wnd setLevel:[self level]+1+extra];  \
     } \
 }  \
 - (void)swellRemoveOwnedWindow:(NSWindow *)wnd \
@@ -1564,10 +1650,11 @@ static HWND last_key_window;
 } \
 - (void)swellResetOwnedWindowLevels { \
   if (SWELL_owned_windows_levelincrease) { OwnedWindowListRec *p=m_ownedwnds; \
-  int l=[self level]+1; \
+  bool active =  [NSApp isActive]; \
+  int l=[self level]+!!active; \
     while (p) { \
       if (p->hwnd) { \
-        int extra = [(id)p->hwnd isKindOfClass:[SWELL_ModelessWindow class]] ? ((SWELL_ModelessWindow *)p->hwnd)->m_wantraiseamt : 0; \
+        int extra = active && [(id)p->hwnd isKindOfClass:[SWELL_ModelessWindow class]] ? ((SWELL_ModelessWindow *)p->hwnd)->m_wantraiseamt : 0; \
         [(NSWindow *)p->hwnd setLevel:l+extra]; \
         if ([(id)p->hwnd respondsToSelector:@selector(swellResetOwnedWindowLevels)]) \
           [(id)p->hwnd swellResetOwnedWindowLevels]; \
@@ -1639,6 +1726,7 @@ SWELLDIALOGCOMMONIMPLEMENTS_WND(0)
 - (id)initModelessForChild:(HWND)child owner:(HWND)owner styleMask:(unsigned int)smask
 {
   INIT_COMMON_VARS
+  m_wantInitialKeyWindowOnShow=0;
   m_wantraiseamt=0;
   lastFrameSize.width=lastFrameSize.height=0.0f;
     
@@ -1653,6 +1741,7 @@ SWELLDIALOGCOMMONIMPLEMENTS_WND(0)
   [self setAcceptsMouseMovedEvents:YES];
   [self setContentView:(NSView *)child];
   [self useOptimizedDrawing:YES];
+  updateWindowCollection(self);
     
   if (owner && [(id)owner respondsToSelector:@selector(swellAddOwnedWindow:)])
   {
@@ -1674,6 +1763,7 @@ SWELLDIALOGCOMMONIMPLEMENTS_WND(0)
 - (id)initModeless:(SWELL_DialogResourceIndex *)resstate Parent:(HWND)parent dlgProc:(DLGPROC)dlgproc Param:(LPARAM)par outputHwnd:(HWND *)hwndOut
 {
   INIT_COMMON_VARS
+  m_wantInitialKeyWindowOnShow=0;
   m_wantraiseamt=0;
 
   lastFrameSize.width=lastFrameSize.height=0.0f;
@@ -1697,6 +1787,7 @@ SWELLDIALOGCOMMONIMPLEMENTS_WND(0)
   [self setAcceptsMouseMovedEvents:YES];
   [self useOptimizedDrawing:YES];
   [self setDelegate:self];
+  updateWindowCollection(self);
   
   if (resstate&&resstate->title) SetWindowText((HWND)self, resstate->title);
   
@@ -1719,11 +1810,10 @@ SWELLDIALOGCOMMONIMPLEMENTS_WND(0)
   SWELL_hwndChild *ch=[[SWELL_hwndChild alloc] initChild:resstate Parent:(NSView *)self dlgProc:dlgproc Param:par];       // create a new child view class
   ch->m_create_windowflags=sf;
   *hwndOut = (HWND)ch;
-
+ 
   [ch release];
 
   [self display];
-  
   [self release]; // matching retain above
   
   return self;
@@ -1779,6 +1869,7 @@ SWELLDIALOGCOMMONIMPLEMENTS_WND(1)
   [self setAcceptsMouseMovedEvents:YES];
   [self useOptimizedDrawing:YES];
   [self setDelegate:self];
+  updateWindowCollection(self);
 
   if (parent && [(id)parent respondsToSelector:@selector(swellAddOwnedWindow:)])
   {
@@ -1879,6 +1970,7 @@ int SWELL_DialogBox(SWELL_DialogResourceIndex *reshead, const char *resid, HWND 
     
   if (![NSApp isActive]) // using this enables better background processing (i.e. if the app isnt active it still runs)
   {
+    [NSApp activateIgnoringOtherApps:YES];
     NSModalSession session = [NSApp beginModalSessionForWindow:box];
     for (;;) 
     {
@@ -1986,7 +2078,7 @@ OSStatus CarbonEvtHandler(EventHandlerCallRef nextHandlerRef, EventRef event, vo
   switch (evtkind)
   {
     case kEventWindowActivated:
-      [NSApp setMainMenu:nil];
+      if (!g_swell_terminating) [NSApp setMainMenu:nil];
     break;
     
     case kEventWindowGetClickActivation: 

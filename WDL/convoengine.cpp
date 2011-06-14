@@ -25,6 +25,7 @@
 #include <windows.h>
 #endif
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <memory.h>
 #include "convoengine.h"
@@ -87,8 +88,6 @@ static void WDL_CONVO_CplxMul3(WDL_FFT_COMPLEX *c, WDL_FFT_COMPLEX *a, WDL_CONVO
   } while (n -= 2);
 }
 
-#define MAX_SIZE_FOR_BRUTE 64
-
 static bool CompareQueueToBuf(WDL_FastQueue *q, const void *data, int len)
 {
   int offs=0;
@@ -131,7 +130,7 @@ WDL_ConvolutionEngine::~WDL_ConvolutionEngine()
 {
 }
 
-int WDL_ConvolutionEngine::SetImpulse(WDL_ImpulseBuffer *impulse, int fft_size, int impulse_sample_offset, int max_imp_size)
+int WDL_ConvolutionEngine::SetImpulse(WDL_ImpulseBuffer *impulse, int fft_size, int impulse_sample_offset, int max_imp_size, bool forceBrute)
 {
   int impulse_len=0;
   int x;
@@ -160,7 +159,7 @@ int WDL_ConvolutionEngine::SetImpulse(WDL_ImpulseBuffer *impulse, int fft_size, 
   m_proc_nch=-1;
 
 
-  if (impulse_len<=MAX_SIZE_FOR_BRUTE && fft_size <= 0)
+  if (forceBrute)
   {
     m_fft_size=0;
 
@@ -344,7 +343,6 @@ void WDL_ConvolutionEngine::Add(WDL_FFT_REAL **bufs, int len, int nch)
             double a = *ip++;
             sum+=a * sp[0];
             sum2+=a * sp[1];
-            ip++;
             sp++;
           }
           pout[x]=(WDL_FFT_REAL) sum;
@@ -726,13 +724,17 @@ WDL_ConvolutionEngine_Div::WDL_ConvolutionEngine_Div()
   m_need_feedsilence=true;
 }
 
-int WDL_ConvolutionEngine_Div::SetImpulse(WDL_ImpulseBuffer *impulse, int maxfft_size, int known_blocksize)
+int WDL_ConvolutionEngine_Div::SetImpulse(WDL_ImpulseBuffer *impulse, int maxfft_size, int known_blocksize, int max_imp_size, int impulse_offset, int latency_allowed)
 {
   m_need_feedsilence=true;
 
   m_engines.Empty(true);
   if (maxfft_size<0)maxfft_size=-maxfft_size;
-  if (!maxfft_size || maxfft_size>65536) maxfft_size=65536;
+  maxfft_size*=2;
+  if (!maxfft_size || maxfft_size>32768) maxfft_size=32768;
+
+
+  const int MAX_SIZE_FOR_BRUTE=64;
 
   int fftsize = MAX_SIZE_FOR_BRUTE;
   int impulsechunksize = MAX_SIZE_FOR_BRUTE;
@@ -742,17 +744,27 @@ int WDL_ConvolutionEngine_Div::SetImpulse(WDL_ImpulseBuffer *impulse, int maxfft
     fftsize=known_blocksize/2;
     impulsechunksize=known_blocksize/2;
   }
+  if (latency_allowed*2 > fftsize)
+  {
+    int x = 16;
+    while (x <= latency_allowed) x*=2;
+    if (x>32768) x=32768;
+    fftsize=impulsechunksize=x;
+  }
 
   int offs=0;
-  int samplesleft=impulse->impulses[0].GetSize();
+  int samplesleft=impulse->impulses[0].GetSize()-impulse_offset;
+  if (max_imp_size>0 && samplesleft>max_imp_size) samplesleft=max_imp_size;
+
   do
   {
     WDL_ConvolutionEngine *eng=new WDL_ConvolutionEngine;
 
-    if (impulsechunksize*3 > samplesleft) impulsechunksize=samplesleft; // early-out, no point going to a larger FFT (since if we did this, we wouldnt have enough samples for a complete next pass)
+    bool wantBrute = !latency_allowed && !offs;
+    if (impulsechunksize*(wantBrute ? 2 : 3) >= samplesleft) impulsechunksize=samplesleft; // early-out, no point going to a larger FFT (since if we did this, we wouldnt have enough samples for a complete next pass)
     if (fftsize>=maxfft_size) { impulsechunksize=samplesleft; fftsize=maxfft_size; } // if FFTs are as large as possible, finish up
 
-    eng->SetImpulse(impulse,fftsize>MAX_SIZE_FOR_BRUTE?fftsize:0,offs,impulsechunksize);
+    eng->SetImpulse(impulse,fftsize,offs+impulse_offset,impulsechunksize, wantBrute);
     eng->m_zl_delaypos = offs;
     eng->m_zl_dumpage=0;
     m_engines.Add(eng);
@@ -777,12 +789,12 @@ int WDL_ConvolutionEngine_Div::SetImpulse(WDL_ImpulseBuffer *impulse, int maxfft
   }
   while (samplesleft > 0);
   
-  return 0;
+  return GetLatency();
 }
 
 int WDL_ConvolutionEngine_Div::GetLatency()
 {
-  return 0;
+  return m_engines.GetSize() ? m_engines.Get(0)->GetLatency() : 0;
 }
 
 

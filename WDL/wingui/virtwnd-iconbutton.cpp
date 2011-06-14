@@ -199,13 +199,13 @@ void WDL_VirtualIconButton::OnPaint(LICE_IBitmap *drawbm, int origin_x, int orig
       {
         int cidx=isdown?COLOR_3DSHADOW:COLOR_3DHILIGHT;
 
-        int pencol = WDL_STYLE_GetSysColor(cidx);
+        int pencol = GSC(cidx);
         pencol = LICE_RGBA_FROMNATIVE(pencol,255);
 
         LICE_Line(drawbm,r.left,r.bottom-1,r.left,r.top,pencol,alpha,LICE_BLIT_MODE_COPY,false);
         LICE_Line(drawbm,r.left,r.top,r.right-1,r.top,pencol,alpha,LICE_BLIT_MODE_COPY,false);
         cidx = isdown?COLOR_3DHILIGHT:COLOR_3DSHADOW;
-        pencol = WDL_STYLE_GetSysColor(cidx);
+        pencol = GSC(cidx);
         pencol = LICE_RGBA_FROMNATIVE(pencol,255);
         LICE_Line(drawbm,r.right-1,r.top,r.right-1,r.bottom-1,pencol,alpha,LICE_BLIT_MODE_COPY,false);
         LICE_Line(drawbm,r.right-1,r.bottom-1,r.left,r.bottom-1,pencol,alpha,LICE_BLIT_MODE_COPY,false);
@@ -267,14 +267,16 @@ void WDL_VirtualIconButton::OnPaint(LICE_IBitmap *drawbm, int origin_x, int orig
     }
 
     LICE_IFont *font = m_textfont;
+    bool isVert=false;
     if (font && m_textfontv && m_position.right-m_position.left < m_position.bottom - m_position.top)
     {
+      isVert=true;
       font = m_textfontv;
     }
     // draw text
     if (font&&m_textlbl.Get()[0])
     {
-      int fgc=m_forcetext_color ? m_forcetext_color : LICE_RGBA_FROMNATIVE(WDL_STYLE_GetSysColor(COLOR_BTNTEXT),255);
+      int fgc=m_forcetext_color ? m_forcetext_color : LICE_RGBA_FROMNATIVE(GSC(COLOR_BTNTEXT),255);
       //font->SetCombineMode(LICE_BLIT_MODE_COPY, alpha); // this affects the glyphs that get cached
       font->SetBkMode(TRANSPARENT);
       font->SetTextColor(fgc);
@@ -291,7 +293,16 @@ void WDL_VirtualIconButton::OnPaint(LICE_IBitmap *drawbm, int origin_x, int orig
         else r2.left+=2;
         r2.top+=2;
       }
-      font->DrawText(drawbm,m_textlbl.Get(),-1,&r2,DT_SINGLELINE|DT_VCENTER|(m_textalign<0?DT_LEFT:m_textalign>0?DT_RIGHT:DT_CENTER)|DT_NOPREFIX);
+      int f = DT_SINGLELINE|DT_NOPREFIX;
+      if (isVert)
+      {
+        f |= DT_CENTER | (m_textalign<0?DT_TOP:m_textalign>0?DT_BOTTOM:DT_VCENTER);
+      }
+      else
+      {
+        f |= DT_VCENTER|(m_textalign<0?DT_LEFT:m_textalign>0?DT_RIGHT:DT_CENTER);
+      }
+      font->DrawText(drawbm,m_textlbl.Get(),-1,&r2,f);
     }
     
   }
@@ -368,6 +379,7 @@ int WDL_VirtualIconButton::OnMouseDown(int xpos, int ypos)
   {
     m_pressed=3;
     RequestRedraw(NULL);
+    if (m__iaccess) m__iaccess->OnFocused();
 
     if (m_immediate)
     {
@@ -419,7 +431,9 @@ void WDL_VirtualIconButton::DoSendCommand(int xpos, int ypos)
         code|=600<<16;
       }
     }
+    WDL_VWND_DCHK(a);
     SendCommand(WM_COMMAND,code,0,this);
+    if (a.isOK() && m__iaccess && m_checkstate>=0) m__iaccess->OnStateChange();
   }
 }
 
@@ -463,6 +477,7 @@ static void GenSubMenu(HMENU menu, int *x, WDL_PtrList<char> *items, int curitem
 
 int WDL_VirtualComboBox::OnMouseDown(int xpos, int ypos)
 {
+  if (m__iaccess) m__iaccess->OnFocused();
   if (m_items.GetSize())
   {    
     //SendCommand(WM_COMMAND, GetID()|(CBN_DROPDOWN<<16), 0, this);
@@ -495,7 +510,9 @@ int WDL_VirtualComboBox::OnMouseDown(int xpos, int ypos)
       m_curitem=ret-1000;
       RequestRedraw(NULL);
     // track menu
+      WDL_VWND_DCHK(a);
       SendCommand(WM_COMMAND,GetID() | (CBN_SELCHANGE<<16),0,this);
+      if (a.isOK() && m__iaccess) m__iaccess->OnStateChange();
     }
   }
   return -1;
@@ -512,21 +529,21 @@ void WDL_VirtualComboBox::OnPaint(LICE_IBitmap *drawbm, int origin_x, int origin
     r.top+=origin_y;
     r.bottom+=origin_y;
 
-    int col=WDL_STYLE_GetSysColor(COLOR_WINDOW);
+    int col=GSC(COLOR_WINDOW);
     col = LICE_RGBA_FROMNATIVE(col,255);
     LICE_FillRect(drawbm,r.left,r.top,r.right-r.left,r.bottom-r.top,col,1.0f,LICE_BLIT_MODE_COPY);
 
     {
       RECT tr=r;
       tr.left=tr.right-(tr.bottom-tr.top);
-      int col2=WDL_STYLE_GetSysColor(COLOR_BTNFACE);
+      int col2=GSC(COLOR_BTNFACE);
       col2 = LICE_RGBA_FROMNATIVE(col2,255);
 
       LICE_FillRect(drawbm,tr.left,tr.top,tr.right-tr.left,tr.bottom-tr.top,col,1.0f,LICE_BLIT_MODE_COPY);
     }
     
 
-    int tcol=WDL_STYLE_GetSysColor(COLOR_BTNTEXT);
+    int tcol=GSC(COLOR_BTNTEXT);
     tcol=LICE_RGBA_FROMNATIVE(tcol,255);
     if (m_font && m_items.Get(m_curitem)&&m_items.Get(m_curitem)[0])
     {
@@ -539,9 +556,9 @@ void WDL_VirtualComboBox::OnPaint(LICE_IBitmap *drawbm, int origin_x, int origin
 
 
     // pen3=tcol
-    int pencol = WDL_STYLE_GetSysColor(COLOR_3DSHADOW);
+    int pencol = GSC(COLOR_3DSHADOW);
     pencol = LICE_RGBA_FROMNATIVE(pencol,255);
-    int pencol2 = WDL_STYLE_GetSysColor(COLOR_3DHILIGHT);
+    int pencol2 = GSC(COLOR_3DHILIGHT);
     pencol2 = LICE_RGBA_FROMNATIVE(pencol2,255);
 
     // draw the down arrow button
@@ -636,6 +653,8 @@ int WDL_VirtualStaticText::OnMouseDown(int xpos, int ypos)
   int a = WDL_VWnd::OnMouseDown(xpos,ypos);
   if (a) return a;
 
+  if (m__iaccess) m__iaccess->OnFocused();
+
   if (m_wantsingle)
   {
     SendCommand(WM_COMMAND,GetID() | (STN_CLICKED<<16),0,this);
@@ -704,13 +723,13 @@ void WDL_VirtualStaticText::OnPaint(LICE_IBitmap *drawbm, int origin_x, int orig
     {    
       int cidx=COLOR_3DSHADOW;
 
-      int pencol = WDL_STYLE_GetSysColor(cidx);
+      int pencol = GSC(cidx);
       pencol = LICE_RGBA_FROMNATIVE(pencol,255);
 
       LICE_Line(drawbm,r.left,r.bottom-1,r.left,r.top,pencol,1.0f,LICE_BLIT_MODE_COPY,false);
       LICE_Line(drawbm,r.left,r.top,r.right-1,r.top,pencol,1.0f,LICE_BLIT_MODE_COPY,false);
       cidx=COLOR_3DHILIGHT;
-      pencol = WDL_STYLE_GetSysColor(cidx);
+      pencol = GSC(cidx);
       pencol = LICE_RGBA_FROMNATIVE(pencol,255);
       LICE_Line(drawbm,r.right-1,r.top,r.right-1,r.bottom-1,pencol,1.0f,LICE_BLIT_MODE_COPY,false);
       LICE_Line(drawbm,r.right-1,r.bottom-1,r.left,r.bottom-1,pencol,1.0f,LICE_BLIT_MODE_COPY,false);
@@ -741,15 +760,34 @@ void WDL_VirtualStaticText::OnPaint(LICE_IBitmap *drawbm, int origin_x, int orig
       if (m_didalign==0)
       {
         RECT r2={0,0,0,0};
-        font->DrawText(drawbm,m_text.Get(),-1,&r2,DT_SINGLELINE|DT_VCENTER|DT_LEFT|DT_NOPREFIX|DT_CALCRECT);
-        if (r2.right > r.right-r.left) m_didalign=-1;
+        font->DrawText(drawbm,m_text.Get(),-1,&r2,DT_SINGLELINE|DT_NOPREFIX|DT_CALCRECT);
+        if (m_didvert)
+        {
+         if (r2.bottom > r.bottom-r.top) m_didalign=-1;
+        }
+        else
+        {
+          if (r2.right > r.right-r.left) m_didalign=-1;
+        }
       }
 
-      int dtflags=DT_SINGLELINE|DT_VCENTER|DT_NOPREFIX;
-      if (m_didalign < 0) dtflags |= DT_LEFT;
-      else if (m_didalign > 0) dtflags |= DT_RIGHT;
-      else dtflags |= DT_CENTER;
+      int dtflags=DT_SINGLELINE|DT_NOPREFIX;
 
+      if (m_didvert)
+      {
+        dtflags |= DT_CENTER;
+        if (m_didalign < 0) dtflags |= DT_TOP;
+        else if (m_didalign > 0) dtflags |= DT_BOTTOM;
+        else dtflags |= DT_VCENTER;
+      }
+      else
+      {
+        dtflags|=DT_VCENTER;
+
+        if (m_didalign < 0) dtflags |= DT_LEFT;
+        else if (m_didalign > 0) dtflags |= DT_RIGHT;
+        else dtflags |= DT_CENTER;
+      }
       const char* txt=m_text.Get();
 
       int abbrx=0;
@@ -762,8 +800,8 @@ void WDL_VirtualStaticText::OnPaint(LICE_IBitmap *drawbm, int origin_x, int orig
         if (len && isdigit(txt[len-1]))
         {
           RECT tr = { 0, 0, 0, 0 };
-          font->DrawText(drawbm, txt, -1, &tr, dtflags|DT_CALCRECT);
-          if (tr.right > r.right-r.left)
+          font->DrawText(drawbm, txt, -1, &tr, DT_SINGLELINE|DT_NOPREFIX|DT_CALCRECT);
+          if (m_didvert ? (tr.bottom > r.bottom-r.top) : (tr.right > r.right-r.left))
           {
             strcpy(abbrbuf, "..");
             int i;
@@ -773,25 +811,44 @@ void WDL_VirtualStaticText::OnPaint(LICE_IBitmap *drawbm, int origin_x, int orig
             }
             strcat(abbrbuf, txt+i+1);
 
-            int f=dtflags&~(DT_LEFT|DT_CENTER);
+            int f=dtflags&~(DT_TOP|DT_VCENTER|DT_BOTTOM|DT_LEFT|DT_CENTER|DT_RIGHT);
             RECT tr2 = { 0, 0, 0, 0 };
-            font->DrawText(drawbm, abbrbuf, -1, &tr2, f|DT_RIGHT|DT_CALCRECT);
-            abbrx=tr2.right;
+            if (m_didvert)
+            {
+              font->DrawText(drawbm, abbrbuf, -1, &tr2, f|DT_CALCRECT);
+              abbrx=tr2.bottom;
+            }
+            else
+            {
+              font->DrawText(drawbm, abbrbuf, -1, &tr2, f|DT_CALCRECT);
+              abbrx=tr2.right;
+            }
           }
         }
       }
 
-      int tcol=m_fg ? m_fg : LICE_RGBA_FROMNATIVE(WDL_STYLE_GetSysColor(COLOR_BTNTEXT));
+      int tcol=m_fg ? m_fg : LICE_RGBA_FROMNATIVE(GSC(COLOR_BTNTEXT));
       font->SetTextColor(tcol);
       if (m_fg && LICE_GETA(m_fg) != 0xff) font->SetCombineMode(LICE_BLIT_MODE_COPY,LICE_GETA(m_fg)/255.0f);
 
       if (abbrx && abbrbuf[0])
       {
-        int f=dtflags&~(DT_LEFT|DT_CENTER|DT_RIGHT);
-        RECT r1 = { r.left, r.top, r.right-abbrx, r.bottom };
-        font->DrawText(drawbm, txt, -1, &r1, f|DT_LEFT);
-        RECT r2 = { r.right-abbrx, r.top, r.right, r.bottom };
-        font->DrawText(drawbm, abbrbuf, -1, &r2, f|DT_RIGHT);
+        if (m_didvert)
+        {
+          int f=dtflags&~(DT_TOP|DT_VCENTER|DT_BOTTOM);
+          RECT r1 = { r.left, r.top, r.right, r.bottom-abbrx };
+          font->DrawText(drawbm, txt, -1, &r1, f|DT_TOP);
+          RECT r2 = { r.left, r.bottom-abbrx, r.right, r.bottom };
+          font->DrawText(drawbm, abbrbuf, -1, &r2, f|DT_BOTTOM);
+        }
+        else
+        {
+          int f=dtflags&~(DT_LEFT|DT_CENTER|DT_RIGHT);
+          RECT r1 = { r.left, r.top, r.right-abbrx, r.bottom };
+          font->DrawText(drawbm, txt, -1, &r1, f|DT_LEFT);
+          RECT r2 = { r.right-abbrx, r.top, r.right, r.bottom };
+          font->DrawText(drawbm, abbrbuf, -1, &r2, f|DT_RIGHT);
+        }
       }
       else
       {
@@ -819,7 +876,7 @@ int WDL_VirtualStaticText::GetCharFromCoord(int xpos, int ypos)
   // for align left/right, we could DT_CALCRECT with 1 char, then 2, etc, but that won't work for align center
   // so we'll just estimate
   RECT tr = { 0, 0, m_position.right-m_position.left, m_position.bottom-m_position.top };
-  font->DrawText(0, str, len, &tr, DT_SINGLELINE|DT_VCENTER|DT_NOPREFIX|DT_CALCRECT);
+  font->DrawText(0, str, len, &tr, DT_SINGLELINE|DT_NOPREFIX|DT_CALCRECT);
   int tw = tr.right;
   int th = tr.bottom;
 

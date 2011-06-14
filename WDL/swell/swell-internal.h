@@ -255,6 +255,7 @@ struct HTREEITEM__
   unsigned int m_create_windowflags;
   NSOpenGLContext *m_glctx;
   char m_isdirty; // &1=self needs redraw, &2=children may need redraw
+  id m_lastTopLevelOwner; // save a copy of the owner, if any
 }
 - (id)initChild:(SWELL_DialogResourceIndex *)resstate Parent:(NSView *)parent dlgProc:(DLGPROC)dlgproc Param:(LPARAM)par;
 - (LRESULT)onSwellMessage:(UINT)msg p1:(WPARAM)wParam p2:(LPARAM)lParam;
@@ -264,6 +265,7 @@ struct HTREEITEM__
 -(LONG)swellGetExtendedStyle;
 -(void)swellSetExtendedStyle:(LONG)st;
 -(HMENU)swellGetMenu;
+-(BOOL)swellHasBeenDestroyed;
 -(void)swellSetMenu:(HMENU)menu;
 -(LONG_PTR)getSwellUserData;
 -(void)setSwellUserData:(LONG_PTR)val;
@@ -328,6 +330,7 @@ struct HTREEITEM__
   OwnedWindowListRec *m_ownedwnds;
   BOOL m_enabled;
   int m_wantraiseamt;
+  bool  m_wantInitialKeyWindowOnShow;
 }
 - (id)initModeless:(SWELL_DialogResourceIndex *)resstate Parent:(HWND)parent dlgProc:(DLGPROC)dlgproc Param:(LPARAM)par outputHwnd:(HWND *)hwndOut;
 - (id)initModelessForChild:(HWND)child owner:(HWND)owner styleMask:(unsigned int)smask;
@@ -555,6 +558,7 @@ struct HGDIOBJ__
   int color;
   int wid;
   struct HGDIOBJ__ *_next;
+  bool _infreelist;
 };
 
 
@@ -580,6 +584,7 @@ struct HDC__ {
   float lastpos_x,lastpos_y;
   
   struct HDC__ *_next;
+  bool _infreelist;
 };
 
 #endif // !OSX

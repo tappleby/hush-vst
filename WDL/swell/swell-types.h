@@ -106,7 +106,14 @@ typedef uintptr_t UINT_PTR, *PUINT_PTR, ULONG_PTR, *PULONG_PTR, DWORD_PTR, *PDWO
 
 
 // SWELLAPP stuff (swellappmain.mm)
+#ifdef __cplusplus
+extern "C"  {
+#endif
 INT_PTR SWELLAppMain(int msg, INT_PTR parm1, INT_PTR parm2); // to be implemented by app (if using swellappmain.mm)
+#ifdef __cplusplus
+};
+#endif
+
 #define SWELLAPP_ONLOAD 0x0001 // initialization of app vars etc
 #define SWELLAPP_LOADED 0x0002 // create dialogs etc
 #define SWELLAPP_DESTROY 0x0003 // about to destroy (cleanup etc)
@@ -792,6 +799,7 @@ __attribute__ ((visibility ("default"))) BOOL WINAPI DllMain(HINSTANCE hInstDLL,
 #define SWP_NOZORDER 4
 #define SWP_NOACTIVATE 8
 #define SWP_SHOWWINDOW 16
+#define SWP_FRAMECHANGED 32
 #define SWP_NOCOPYBITS 0
 #define HWND_TOP        ((HWND)0)
 #define HWND_BOTTOM     ((HWND)1)
@@ -1281,6 +1289,16 @@ extern struct SWELL_MenuResourceIndex *SWELL_curmodule_menuresource_head;
 #define WAIT_TIMEOUT                        (0x00000102L)
 #define WAIT_FAILED (DWORD)0xFFFFFFFF
 #define INFINITE            0xFFFFFFFF
+
+
+typedef struct _ICONINFO
+{
+  BOOL fIcon;
+  DWORD xHotspot;
+  DWORD yHotspot;
+  HBITMAP hbmMask;
+  HBITMAP hbmColor;
+} ICONINFO, *PICONINFO;
 
 
 #endif //_WDL_SWELL_H_TYPES_DEFINED_

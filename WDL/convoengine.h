@@ -79,7 +79,7 @@ public:
   WDL_ConvolutionEngine();
   ~WDL_ConvolutionEngine();
 
-  int SetImpulse(WDL_ImpulseBuffer *impulse, int fft_size=-1, int impulse_sample_offset=0, int max_imp_size=0);
+  int SetImpulse(WDL_ImpulseBuffer *impulse, int fft_size=-1, int impulse_sample_offset=0, int max_imp_size=0, bool forceBrute=false);
  
   int GetFFTSize() { return m_fft_size; }
   int GetLatency() { return m_fft_size/2; }
@@ -136,7 +136,7 @@ public:
   WDL_ConvolutionEngine_Div();
   ~WDL_ConvolutionEngine_Div();
 
-  int SetImpulse(WDL_ImpulseBuffer *impulse, int maxfft_size=-1, int known_blocksize=0);
+  int SetImpulse(WDL_ImpulseBuffer *impulse, int maxfft_size=0, int known_blocksize=0, int max_imp_size=0, int impulse_offset=0, int latency_allowed=0);
 
   int GetLatency();
   void Reset();

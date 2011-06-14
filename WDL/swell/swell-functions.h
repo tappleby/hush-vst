@@ -33,7 +33,11 @@
 
 
 #ifdef SWELL_PROVIDED_BY_APP
-#define SWELL_API_DEFINE(ret,func,parms) extern ret (*func)parms;
+  #ifdef __cplusplus
+    #define SWELL_API_DEFINE(ret,func,parms) extern "C" ret (*func)parms;
+  #else
+    #define SWELL_API_DEFINE(ret,func,parms) extern ret (*func)parms;
+  #endif
 #else
 #define SWELL_API_DEFINE(ret,func,parms) ret func parms ;
 #endif
@@ -464,7 +468,7 @@ SWELL_API_DEFINE(bool, ListView_Scroll,(HWND h, int xscroll, int yscroll))
 #define ImageList_Create(x,y,a,b,c) ImageList_CreateEx();
 #endif
 SWELL_API_DEFINE(HIMAGELIST, ImageList_CreateEx,())
-SWELL_API_DEFINE(void, ImageList_ReplaceIcon,(HIMAGELIST list, int offset, HICON image))
+SWELL_API_DEFINE(int, ImageList_ReplaceIcon,(HIMAGELIST list, int offset, HICON image))
 SWELL_API_DEFINE(void, ImageList_Destroy, (HIMAGELIST))
 /*
 ** TabCtrl api. 
@@ -838,8 +842,9 @@ SWELL_API_DEFINE(BOOL,ResetEvent,(HANDLE evt))
 SWELL_API_DEFINE(void,SWELL_EnsureMultithreadedCocoa,())
 SWELL_API_DEFINE(void *, SWELL_InitAutoRelease,())
 SWELL_API_DEFINE(void, SWELL_QuitAutoRelease,(void *p))
-SWELL_API_DEFINE(HANDLE,SWELL_CreateProcess,(const char *exe, int nparams, const char **params))
 #endif
+
+SWELL_API_DEFINE(HANDLE,SWELL_CreateProcess,(const char *exe, int nparams, const char **params))
 
 
 SWELL_API_DEFINE(HINSTANCE,LoadLibraryGlobals,(const char *fileName, bool symbolsAsGlobals))
@@ -956,6 +961,7 @@ SWELL_API_DEFINE(BOOL, GetTextMetrics,(HDC ctx, TEXTMETRIC *tm))
 SWELL_API_DEFINE(void *, GetNSImageFromHICON,(HICON))
 #endif
 SWELL_API_DEFINE(BOOL, GetObject, (HICON icon, int bmsz, void *_bm))
+SWELL_API_DEFINE(HICON, CreateIconIndirect, (ICONINFO* iconinfo))
 SWELL_API_DEFINE(HICON, LoadNamedImage,(const char *name, bool alphaFromMask))
 SWELL_API_DEFINE(void, DrawImageInRect,(HDC ctx, HICON img, RECT *r))
 SWELL_API_DEFINE(void, BitBlt,(HDC hdcOut, int x, int y, int w, int h, HDC hdcIn, int xin, int yin, int mode))
@@ -1023,11 +1029,22 @@ SWELL_API_DEFINE(HWND, SWELL_MakeCheckBox,(const char *name, int idx, int x, int
 SWELL_API_DEFINE(HWND, SWELL_MakeListBox,(int idx, int x, int y, int w, int h, int styles))
 
 SWELL_API_DEFINE(void, SWELL_Menu_AddMenuItem,(HMENU hMenu, const char *name, int idx, int flags))
+SWELL_API_DEFINE(int, SWELL_GenerateMenuFromList,(HMENU hMenu, const void *list, int listsz)) // list is SWELL_MenuGen_Entry
 
+SWELL_API_DEFINE(void, SWELL_GenerateDialogFromList, (const void *list, int listsz))
 
 
 SWELL_API_DEFINE(unsigned int, _controlfp,(unsigned int flag, unsigned int mask))
 
+SWELL_API_DEFINE(void,SWELL_Internal_PostMessage_Init,())
 
+
+SWELL_API_DEFINE(HCURSOR,SWELL_LoadCursorFromFile,(const char *fn))
+SWELL_API_DEFINE(void,SWELL_SetWindowWantRaiseAmt,(HWND h, int  amt))
+
+#ifndef __APPLE__
+SWELL_API_DEFINE(void,SWELL_initargs,(int *argc, char ***argv))
+SWELL_API_DEFINE(void,SWELL_RunMessageLoop,())
+#endif
 
 #endif // _WDL_SWELL_H_API_DEFINED_

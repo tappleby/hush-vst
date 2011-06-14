@@ -1,15 +1,15 @@
 /*
   durand_kerner.h
   Copyright (C) 2011 and later Lubomir I. Ivanov (neolit123 [at] gmail)
-  
+
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
   arising from the use of this software.
-  
+
   Permission is granted to anyone to use this software for any purpose,
   including commercial applications, and to alter it and redistribute it
   freely, subject to the following restrictions:
-  
+
   1. The origin of this software must not be misrepresented; you must not
      claim that you wrote the original software. If you use this software
      in a product, an acknowledgment in the product documentation would be
@@ -52,12 +52,22 @@ void durand_kerner_c
 {
   register cmath_uint16_t i, j;
   register cmath_uint32_t itr;
-  register cnum_s x;
+  cnum_s coeff_sc[DK_MAX_N];
+  cnum_s x;
+  cnum_s hor; /* needs an address or breaks g++ 4.x */
 
   i = 0;
   while(i < order)
   {
     cnum_from(&roots[i], cnum_pow(dk_demoivre_c, i));
+    i++;
+  }
+
+  cnum_from(&coeff_sc[0], cnum_r1);
+  i = 1;
+  while(i < order+1)
+  {
+    cnum_from(&coeff_sc[i], cnum_div(coeff[i], coeff[0]));
     i++;
   }
 
@@ -68,14 +78,15 @@ void durand_kerner_c
     while(i < order)
     {
       j = 0;
-      x = cnum_new(1, 0);
+      x = cnum_r1;
       while (j < order)
       {
         if (i != j)
           x = cnum_mul(cnum_sub(roots[i], roots[j]), x);
         j++;
       }
-      x = cnum_div(horner_eval_c(coeff, roots[i], order), x);
+      hor = horner_eval_c(coeff_sc, roots[i], order);
+      x = cnum_div(hor, x);
       x = cnum_sub(roots[i], x);
       if (cmath_abs(cmath_abs(x.r) - cmath_abs(roots[i].r)) < DK_EPSILON &&
           cmath_abs(cmath_abs(x.i) - cmath_abs(roots[i].i)) < DK_EPSILON)

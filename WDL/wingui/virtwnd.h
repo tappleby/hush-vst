@@ -47,6 +47,7 @@
 
 
 
+class WDL_VWnd_Painter;
 class LICE_IBitmap;
 
 // deprecated
@@ -60,7 +61,14 @@ class WDL_VWnd_IAccessibleBridge
 {
 public:
   virtual void Release()=0;
+  virtual void ClearCaches(){}
+  virtual void OnFocused() {} 
+  virtual void OnStateChange() {}
 };
+
+
+#include "../destroycheck.h"
+#define WDL_VWND_DCHK(n) WDL_DestroyCheck n(&m_destroystate)
 
 class WDL_VWnd
 {
@@ -125,6 +133,8 @@ public:
 
   virtual void SetChildPosition(WDL_VWnd *ch, int pos);
   
+  virtual void SetCurPainter(WDL_VWnd_Painter *p) { m_curPainter=p; }
+  virtual bool IsDescendent(WDL_VWnd *w);
 protected:
   WDL_VWnd *m_parent;
   WDL_VWnd_IAccessibleBridge *m__iaccess;
@@ -140,6 +150,10 @@ protected:
 
   const char *m__iaccess_desc;
 
+  WDL_VWnd_Painter *m_curPainter;
+  virtual int GSC(int a);
+
+  WDL_DestroyState m_destroystate;
 };
 
 
@@ -180,6 +194,7 @@ public:
 
   void PaintEnd();
 
+  int GSC(int a);
 private:
 
   double m_gradstart,m_gradslope;

@@ -811,7 +811,30 @@ HWND GetDlgItem(HWND hwnd, int idx)
   
   if (!idx || !v) return (HWND)v;
   
-  return (HWND) [v viewWithTag:idx];
+  NSArray *ar = [v subviews];
+  int n=[ar count];
+  int x;
+  for (x=0;x<n;x++)
+  {
+    NSView *sv = [ar objectAtIndex:x];
+    if (sv)
+    {
+      if ([sv respondsToSelector:@selector(tag)] && [sv tag] == idx) return (HWND)sv;
+
+      if (sv && [sv isKindOfClass:[NSScrollView class]])
+      {
+        sv=[(NSScrollView *)sv documentView];
+        if (sv && [sv respondsToSelector:@selector(tag)] && [sv tag] == idx) return (HWND)sv;
+      }
+      if (sv && [sv isKindOfClass:[NSClipView class]]) 
+      {
+        sv = [(NSClipView *)sv documentView];
+        if (sv && [sv respondsToSelector:@selector(tag)] && [sv tag] == idx) return (HWND)sv;
+      }
+    }
+  }
+  // we might want to enable this for max compat with old code, but hopefully not:  return [v viewWithTag:idx]; 
+  return NULL;
 }
 
 
@@ -1167,38 +1190,38 @@ STANDARD_CONTROL_NEEDSDISPLAY_IMPL
 LRESULT SendMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
   if (!hwnd) return 0;
-  id turd=(id)hwnd;
-  if ([turd respondsToSelector:@selector(onSwellMessage:p1:p2:)])
+  id obj=(id)hwnd;
+  if ([obj respondsToSelector:@selector(onSwellMessage:p1:p2:)])
   {
-    return (LRESULT) [turd onSwellMessage:msg p1:wParam p2:lParam];
+    return (LRESULT) [obj onSwellMessage:msg p1:wParam p2:lParam];
   }
   else 
   {
-    if (msg == BM_GETCHECK && [turd isKindOfClass:[NSButton class]])
+    if (msg == BM_GETCHECK && [obj isKindOfClass:[NSButton class]])
     {
-      int a=[(NSButton*)turd state];
+      int a=[(NSButton*)obj state];
       if (a==NSMixedState) return BST_INDETERMINATE;
       return a!=NSOffState;
     }
-    if (msg == BM_SETCHECK && [turd isKindOfClass:[NSButton class]])
+    if (msg == BM_SETCHECK && [obj isKindOfClass:[NSButton class]])
     {
-      [(NSButton*)turd setState:(wParam&BST_INDETERMINATE)?NSMixedState:((wParam&BST_CHECKED)?NSOnState:NSOffState)];
+      [(NSButton*)obj setState:(wParam&BST_INDETERMINATE)?NSMixedState:((wParam&BST_CHECKED)?NSOnState:NSOffState)];
       return 0;
     }
-    if ((msg==BM_GETIMAGE || msg == BM_SETIMAGE) && [turd isKindOfClass:[SWELL_Button class]])
+    if ((msg==BM_GETIMAGE || msg == BM_SETIMAGE) && [obj isKindOfClass:[SWELL_Button class]])
     {
       if (wParam != IMAGE_BITMAP && wParam != IMAGE_ICON) return 0; // ignore unknown types
-      LONG_PTR ret=(LONG_PTR) (void *)[turd getSwellGDIImage];
+      LONG_PTR ret=(LONG_PTR) (void *)[obj getSwellGDIImage];
       if (msg==BM_SETIMAGE)
       {
         NSImage *img=NULL;
         if (lParam) img=(NSImage *)__GetNSImageFromHICON((HICON)lParam);
-        [turd setImage:img];
-        [turd setSwellGDIImage:(void *)(img?lParam:0)];
+        [obj setImage:img];
+        [obj setSwellGDIImage:(void *)(img?lParam:0)];
       }
       return ret;
     }
-    else if (msg >= CB_ADDSTRING && msg <= CB_INITSTORAGE && ([turd isKindOfClass:[NSPopUpButton class]] || [turd isKindOfClass:[NSComboBox class]]))
+    else if (msg >= CB_ADDSTRING && msg <= CB_INITSTORAGE && ([obj isKindOfClass:[NSPopUpButton class]] || [obj isKindOfClass:[NSComboBox class]]))
     {
         switch (msg)
         {
@@ -1220,7 +1243,7 @@ LRESULT SendMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         }
         return 0;
     }
-    else if (msg >= TBM_GETPOS && msg <= TBM_SETRANGE && ([turd isKindOfClass:[NSSlider class]]))
+    else if (msg >= TBM_GETPOS && msg <= TBM_SETRANGE && ([obj isKindOfClass:[NSSlider class]]))
     {
         switch (msg)
         {
@@ -1231,19 +1254,29 @@ LRESULT SendMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         }
         return 0;
     }
-    else if (msg == EM_SETSEL && ([turd isKindOfClass:[NSTextField class]]))
-    {
-      [(NSTextField*)turd selectText:turd]; // Force the window's text field editor onto this control
-      NSText* text = [[turd window] fieldEditor:YES forObject:(NSTextField*)turd]; // then get it from the window
-      
-      int sl = [[text string] length];
-      if (wParam == -1) lParam = wParam = 0;
-      else if (lParam == -1) lParam = sl;
-      
-      if (wParam>sl) wParam=sl;
-      if (lParam>sl) lParam=sl;
-      
-      [text setSelectedRange:NSMakeRange(wParam, max(lParam-wParam,0))]; // and set the range
+    else if ((msg == EM_SETSEL || msg == EM_GETSEL) && ([obj isKindOfClass:[NSTextField class]]))
+    { 
+      if (msg == EM_GETSEL)
+      {
+        NSText* text=[[obj window] fieldEditor:YES forObject:(NSTextField*)obj];  
+        // don't know how to validate that the field editor is currently associated with obj,
+        // but if it's not, there's no point in sending EM_GETSEL in the first place 
+        NSRange range=[text selectedRange];
+        if (wParam) *(int*)wParam=range.location;
+        if (lParam) *(int*)lParam=range.location+range.length;
+      }      
+      else if (msg == EM_SETSEL)
+      {        
+        [(NSTextField*)obj selectText:obj]; // Force the window's text field editor onto this control
+        NSText* text = [[obj window] fieldEditor:YES forObject:(NSTextField*)obj]; // then get it from the window        
+        
+        int sl = [[text string] length];
+        if (wParam == -1) lParam = wParam = 0;
+        else if (lParam == -1) lParam = sl;        
+        if (wParam>sl) wParam=sl;
+        if (lParam>sl) lParam=sl;      
+        [text setSelectedRange:NSMakeRange(wParam, max(lParam-wParam,0))]; // and set the range
+      }
       return 0;
     }
     else
@@ -1251,12 +1284,12 @@ LRESULT SendMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
       NSWindow *w;
       NSView *v;
       // if content view gets unhandled message send to window
-      if ([turd isKindOfClass:[NSView class]] && (w=[turd window]) && [w contentView] == turd && [w respondsToSelector:@selector(onSwellMessage:p1:p2:)])
+      if ([obj isKindOfClass:[NSView class]] && (w=[obj window]) && [w contentView] == obj && [w respondsToSelector:@selector(onSwellMessage:p1:p2:)])
       {
         return (LRESULT) [(SWELL_hwndChild *)w onSwellMessage:msg p1:wParam p2:lParam];
       }
       // if window gets unhandled message send to content view
-      else if ([turd isKindOfClass:[NSWindow class]] && (v=[turd contentView]) && [v respondsToSelector:@selector(onSwellMessage:p1:p2:)])
+      else if ([obj isKindOfClass:[NSWindow class]] && (v=[obj contentView]) && [v respondsToSelector:@selector(onSwellMessage:p1:p2:)])
       {
         return (LRESULT) [(SWELL_hwndChild *)v onSwellMessage:msg p1:wParam p2:lParam];
       }
@@ -1349,17 +1382,19 @@ void SetFocus(HWND hwnd) // these take NSWindow/NSView, and return NSView *
   
   if ([r isKindOfClass:[NSWindow class]])
   {
-    [(NSWindow *)r makeKeyAndOrderFront:nil];
     [(NSWindow *)r makeFirstResponder:[(NSWindow *)r contentView]]; 
+    if ([(NSWindow *)r isVisible]) [(NSWindow *)r makeKeyAndOrderFront:nil];
   }
   else if ([r isKindOfClass:[NSView class]])
   {
     NSWindow *wnd=[(NSView *)r window];
     if (wnd)
     {
-    if ((NSView *)r == [wnd contentView])
-        [wnd makeKeyAndOrderFront:nil];
       [wnd makeFirstResponder:r];
+      if ([wnd isVisible])
+      {
+        [wnd makeKeyAndOrderFront:nil];
+      }
     }
   }
 }
@@ -1785,6 +1820,10 @@ HWND SetParent(HWND hwnd, HWND newPar)
       GetWindowText(hwnd,oldtitle,sizeof(oldtitle));
     
       NSWindow *oldwnd = [tv window];
+      id oldown = NULL;
+      if ([oldwnd respondsToSelector:@selector(swellGetOwner)]) oldown=[oldwnd swellGetOwner];
+
+      if ([tv isKindOfClass:[SWELL_hwndChild class]]) ((SWELL_hwndChild*)tv)->m_lastTopLevelOwner = oldown;
     
       [tv retain];
       SWELL_hwndChild *tmpview = [[SWELL_hwndChild alloc] initChild:nil Parent:(NSView *)oldwnd dlgProc:nil Param:0];          
@@ -1799,7 +1838,6 @@ HWND SetParent(HWND hwnd, HWND newPar)
     }
     else if (!newPar) // not content view, not parent (so making it a top level modeless dialog)
     {
-      NSWindow *oldw = [tv window];
       char oldtitle[2048];
       oldtitle[0]=0;
       GetWindowText(hwnd,oldtitle,sizeof(oldtitle));
@@ -1811,9 +1849,28 @@ HWND SetParent(HWND hwnd, HWND newPar)
       unsigned int wf=(NSTitledWindowMask|NSMiniaturizableWindowMask|NSClosableWindowMask|NSResizableWindowMask);
       if ([tv respondsToSelector:@selector(swellCreateWindowFlags)])
         wf=(unsigned int)[(SWELL_hwndChild *)tv swellCreateWindowFlags];
+
+      HWND newOwner=NULL;
+      if ([tv isKindOfClass:[SWELL_hwndChild class]])
+      {
+         id oldown = ((SWELL_hwndChild*)tv)->m_lastTopLevelOwner;
+         if (oldown)
+         {
+           NSArray *ch=[NSApp windows];
+           int x,n=[ch count];
+           for(x=0;x<n && !newOwner; x ++)
+           {
+             NSWindow *w = [ch objectAtIndex:x];
+             if (w == (NSWindow *)oldown || [w contentView] == (NSView *)oldown) newOwner = (HWND)w;
+           }
+         }
+      }
+
       HWND SWELL_CreateModelessFrameForWindow(HWND childW, HWND ownerW, unsigned int);
-      HWND bla=SWELL_CreateModelessFrameForWindow((HWND)tv,(HWND)oldw,wf);
+      HWND bla=SWELL_CreateModelessFrameForWindow((HWND)tv,(HWND)newOwner,wf);
       // create a new modeless frame 
+
+     
       
       [(NSWindow *)bla display];
       
@@ -1916,32 +1973,42 @@ bool IsEquivalentTextView(HWND h1, HWND h2)
 
 BOOL SetDlgItemText(HWND hwnd, int idx, const char *text)
 {
-  NSView *poo=(NSView *)(idx ? GetDlgItem(hwnd,idx) : hwnd);
-  if (!poo) return false;
+  NSView *obj=(NSView *)(idx ? GetDlgItem(hwnd,idx) : hwnd);
+  if (!obj) return false;
   
   NSWindow *nswnd;
-  if ([(id)poo isKindOfClass:[NSView class]] && (nswnd=[(NSView *)poo window]) && [nswnd contentView]==(id)poo)
-    SetDlgItemText((HWND)nswnd,0,text); // also set window if setting content view
-    
-  if ([poo respondsToSelector:@selector(onSwellSetText:)])
+  if ([(id)obj isKindOfClass:[NSView class]] && (nswnd=[(NSView *)obj window]) && [nswnd contentView]==(id)obj)
   {
-    [(SWELL_hwndChild*)poo onSwellSetText:text];
+    SetDlgItemText((HWND)nswnd,0,text); // also set window if setting content view
+  }
+  
+  if ([obj respondsToSelector:@selector(onSwellSetText:)])
+  {
+    [(SWELL_hwndChild*)obj onSwellSetText:text];
     return TRUE;
   }
   
   BOOL rv=TRUE;  
   NSString *lbl=(NSString *)SWELL_CStringToCFString(text);
-  if ([poo isKindOfClass:[NSWindow class]] || [poo isKindOfClass:[NSButton class]]) [(NSButton*)poo setTitle:lbl];
-  else if ([poo isKindOfClass:[NSControl class]]) 
+  if ([obj isKindOfClass:[NSWindow class]] || [obj isKindOfClass:[NSButton class]]) [(NSButton*)obj setTitle:lbl];
+  else if ([obj isKindOfClass:[NSControl class]]) 
   {
-    [(NSControl*)poo setStringValue:lbl];
-    if ([poo isKindOfClass:[NSTextField class]] && [(NSTextField *)poo isEditable])
+    [(NSControl*)obj setStringValue:lbl];
+    if ([obj isKindOfClass:[NSTextField class]] && [(NSTextField *)obj isEditable])
     {
-      SendMessage(GetParent((HWND)poo),WM_COMMAND,[(NSControl *)poo tag]|(EN_CHANGE<<16),(LPARAM)poo);
+      SendMessage(GetParent((HWND)obj),WM_COMMAND,[(NSControl *)obj tag]|(EN_CHANGE<<16),(LPARAM)obj);
     }
   }
-  else if ([poo isKindOfClass:[NSText class]])  [(NSText*)poo setString:lbl];
-  else rv=FALSE;
+  else if ([obj isKindOfClass:[NSText class]])  
+  {
+    // todo if there is a way to find out that the window's NSTextField is already assigned 
+    // to another field, restore the assignment afterwards
+    [(NSText*)obj setString:lbl];
+  }
+  else
+  {
+    rv=FALSE;
+  }
   
   [lbl release];
   return rv;
@@ -2334,6 +2401,14 @@ void ShowWindow(HWND hwnd, int cmd)
   
   if (pid && [pid isKindOfClass:[NSWindow class]])
   {
+    if (cmd == SW_SHOWNA && [pid isKindOfClass:[SWELL_ModelessWindow class]])
+    {
+      if (((SWELL_ModelessWindow *)pid)->m_wantInitialKeyWindowOnShow)
+      {
+        ((SWELL_ModelessWindow *)pid)->m_wantInitialKeyWindowOnShow=false;
+        cmd = SW_SHOW;
+      }
+    }
     if (cmd==SW_SHOW)
     {
       [pid makeKeyAndOrderFront:pid];
@@ -3533,12 +3608,6 @@ int ListView_GetNextItem(HWND h, int istart, int flags)
         if ([tv isRowSelected:istart]) return istart;
         istart++;
       }
-      istart=0;
-      while (istart <= orig_start && istart < n)
-      {
-        if ([tv isRowSelected:istart]) return istart;
-        istart++;        
-      }
       return -1;
     }
     
@@ -4585,22 +4654,22 @@ void ImageList_Destroy(HIMAGELIST list)
   delete p;
 }
 
-void ImageList_ReplaceIcon(HIMAGELIST list, int offset, HICON image)
+int ImageList_ReplaceIcon(HIMAGELIST list, int offset, HICON image)
 {
-  if (!image || !list) return;
+  if (!image || !list) return -1;
   WDL_PtrList<HGDIOBJ__> *l=(WDL_PtrList<HGDIOBJ__> *)list;
-  if (offset<0||offset>=l->GetSize()) l->Add(image);
+  if (offset<0||offset>=l->GetSize()) 
+  {
+    l->Add(image);
+    offset=l->GetSize()-1;
+  }
   else
   {
     HICON old=l->Get(offset);
     l->Set(offset,image);
-    // if (old) DestroyIcon(old); // don't delete, caller responsible
   }
+  return offset;
 }
-
-
-
-
 
 
 int EnumPropsEx(HWND hwnd, PROPENUMPROCEX proc, LPARAM lParam)
@@ -5070,16 +5139,26 @@ void SWELL_DrawFocusRect(HWND hwndPar, RECT *rct, void **handle)
     if (r.top>r.bottom) { int a=r.top; r.top=r.bottom;r.bottom=a; }
     NSRect rr=NSMakeRect(r.left,r.top,r.right-r.left,r.bottom-r.top);
     
+    NSWindow *par=nil;
+    if (hwndPar)
+    {
+      if ([(id)hwndPar isKindOfClass:[NSWindow class]]) par=(NSWindow *)hwndPar;
+      else if ([(id)hwndPar isKindOfClass:[NSView class]]) par=[(NSView *)hwndPar window];
+      else return;
+    }
+    
+    if (wnd && ([wnd parentWindow] != par))
+    {
+      NSWindow *ow=[wnd parentWindow];
+      if (ow) [ow removeChildWindow:wnd];
+      //      [wnd setParentWindow:nil];
+      [wnd close];
+      *handle=0;
+      wnd=0;    
+    }
+    
     if (!wnd)
     {
-      NSWindow *par=nil;
-      if (hwndPar)
-      {
-        if ([(id)hwndPar isKindOfClass:[NSWindow class]]) par=(NSWindow *)hwndPar;
-        else if ([(id)hwndPar isKindOfClass:[NSView class]]) par=[(NSView *)hwndPar window];
-        else return;
-      }
-      
       *handle  = wnd = [[NSWindow alloc] initWithContentRect:rr styleMask:NSBorderlessWindowMask backing:NSBackingStoreBuffered defer:YES];
       [wnd setOpaque:YES];
       [wnd setAlphaValue:0.5];
@@ -5088,6 +5167,11 @@ void SWELL_DrawFocusRect(HWND hwndPar, RECT *rct, void **handle)
       [wnd setContentView:[[SWELL_FocusRectWnd alloc] init]];
       
       if (par) [par addChildWindow:wnd ordered:NSWindowAbove];
+      else 
+      {
+        [wnd setLevel:NSPopUpMenuWindowLevel];
+        [wnd orderFront:wnd];
+      }
       //    [wnd setParentWindow:par];
 //      [wnd orderWindow:NSWindowAbove relativeTo:[par windowNumber]];
     }
@@ -5199,7 +5283,7 @@ void SWELL_SetWindowWantRaiseAmt(HWND h, int  amt)
   {
     int diff = amt - mw->m_wantraiseamt;
     mw->m_wantraiseamt = amt;
-    if (diff) [mw setLevel:[mw level]+diff];
+    if (diff && [NSApp isActive]) [mw setLevel:[mw level]+diff];
   }
 }
 
@@ -5277,9 +5361,76 @@ void SWELL_SetWindowRepre(HWND hwnd, const char *fn, bool isDirty)
   }
 }
 
+int g_swell_terminating;
 void SWELL_PostQuitMessage(void *sender)
 {
+  g_swell_terminating=true;
+
   [NSApp terminate:(id)sender];
 }
+
+#if 0 // not sure if this will interfere with coolSB
+BOOL ShowScrollBar(HWND hwnd, int nBar, BOOL vis)
+{
+  int v=0;
+  if (nBar == SB_HORZ || nBar == SB_BOTH) v |= WS_HSCROLL;
+  if (nBar == SB_VERT || nBar == SB_BOTH) v |= WS_VSCROLL;
+  if (v)
+  {
+    int s=GetWindowLong(hwnd, GWL_STYLE);
+    if (vis) s |= v;
+    else s &= ~v;
+    SetWindowLong(hwnd, GWL_STYLE, s);
+    SetWindowPos(hwnd, 0, 0, 0, 0, 0, SWP_FRAMECHANGED|SWP_NOZORDER|SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);
+    return TRUE;
+  }
+  return FALSE;
+}
+#endif
+
+
+void SWELL_GenerateDialogFromList(const void *_list, int listsz)
+{
+#define SIXFROMLIST list->p1,list->p2,list->p3, list->p4, list->p5, list->p6
+  SWELL_DlgResourceEntry *list = (SWELL_DlgResourceEntry*)_list;
+  while (listsz>0)
+  {
+    if (!strcmp(list->str1,"__SWELL_BUTTON"))
+    {
+      SWELL_MakeButton(list->flag1,list->str2, SIXFROMLIST);
+    } 
+    else if (!strcmp(list->str1,"__SWELL_EDIT"))
+    {
+      SWELL_MakeEditField(SIXFROMLIST);
+    }
+    else if (!strcmp(list->str1,"__SWELL_COMBO"))
+    {
+      SWELL_MakeCombo(SIXFROMLIST);
+    }
+    else if (!strcmp(list->str1,"__SWELL_LISTBOX"))
+    {
+      SWELL_MakeListBox(SIXFROMLIST);
+    }
+    else if (!strcmp(list->str1,"__SWELL_GROUP"))
+    {
+      SWELL_MakeGroupBox(list->str2,SIXFROMLIST);
+    }
+    else if (!strcmp(list->str1,"__SWELL_CHECKBOX"))
+    {
+      SWELL_MakeCheckBox(list->str2,SIXFROMLIST);
+    }
+    else if (!strcmp(list->str1,"__SWELL_LABEL"))
+    {
+      SWELL_MakeLabel(list->flag1, list->str2, SIXFROMLIST);
+    }
+    else if (*list->str2)
+    {
+      SWELL_MakeControl(list->str1, list->flag1, list->str2, SIXFROMLIST);
+    }
+    listsz--;
+    list++;
+  }
+}
+
 
 #endif

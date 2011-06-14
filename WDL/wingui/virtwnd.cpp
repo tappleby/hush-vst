@@ -50,6 +50,11 @@ void WDL_VWnd_Painter::SetGSC(int (*GSC)(int))
 {
   m_GSC=GSC;
 }
+int WDL_VWnd_Painter::GSC(int a)
+{
+  if (m_GSC) return m_GSC(a);
+  return GetSysColor(a);
+}
 
 void WDL_VWnd_Painter::SetBGGradient(int wantGradient, double start, double slope)
 {
@@ -428,12 +433,14 @@ void WDL_VWnd_Painter::PaintVirtWnd(WDL_VWnd *vwnd, int borderflags)
     tr.right -= m_paint_xorig;
     tr.top -= m_paint_yorig;
     tr.bottom -= m_paint_yorig;
+    vwnd->SetCurPainter(this);
     vwnd->OnPaint(m_bm,-m_paint_xorig,-m_paint_yorig,&tr);
     if (borderflags)
     {
       PaintBorderForRect(&r,borderflags);
     }
     if (vwnd->WantsPaintOver()) vwnd->OnPaintOver(m_bm,-m_paint_xorig,-m_paint_yorig,&tr);
+    vwnd->SetCurPainter(NULL);
 
   }
 }
@@ -503,6 +510,7 @@ WDL_VWnd::WDL_VWnd()
   m_captureidx=-1;
   m_lastmouseidx=-1;
   m_userdata=0;
+  m_curPainter=0;
 }
 
 WDL_VWnd::~WDL_VWnd() 
@@ -515,6 +523,10 @@ WDL_VWnd::~WDL_VWnd()
   if (m__iaccess) m__iaccess->Release();
 }
 
+int WDL_VWnd::GSC(int a)
+{
+  return m_curPainter ? m_curPainter->GSC(a) : GetSysColor(a);
+}
 
 INT_PTR WDL_VWnd::SendCommand(int command, INT_PTR parm1, INT_PTR parm2, WDL_VWnd *src)
 {
@@ -590,6 +602,18 @@ void WDL_VWnd::RequestRedraw(RECT *r)
   else if (m_parent) m_parent->RequestRedraw(&r2); 
 }
 
+bool WDL_VWnd::IsDescendent(WDL_VWnd *w)
+{
+  if (!w || !m_children) return false;
+  int x,n=m_children->GetSize();
+  for(x=0;x<n;x++) if (m_children->Get(x) == w) return true;
+  for(x=0;x<n;x++) 
+  {
+    WDL_VWnd *tmp = m_children->Get(x);
+    if (tmp && tmp->IsDescendent(w)) return true;
+  }
+  return false;
+}
 
 void WDL_VWnd::SetChildPosition(WDL_VWnd *ch, int pos)
 {
@@ -619,6 +643,7 @@ void WDL_VWnd::AddChild(WDL_VWnd *wnd, int pos)
   if (!m_children) m_children=new WDL_PtrList<WDL_VWnd>;
   if (pos<0||pos>=m_children->GetSize()) m_children->Add(wnd);
   else m_children->Insert(pos,wnd);
+  if (m__iaccess) m__iaccess->ClearCaches();
 }
 
 WDL_VWnd *WDL_VWnd::GetChildByID(int id)
@@ -647,6 +672,7 @@ void WDL_VWnd::RemoveChild(WDL_VWnd *wnd, bool dodel)
     }
     m_children->Delete(idx,dodel);
   }
+  if (m__iaccess) m__iaccess->ClearCaches();
 }
 
 
@@ -676,7 +702,9 @@ void WDL_VWnd::OnPaint(LICE_IBitmap *drawbm, int origin_x, int origin_y, RECT *c
 
         if (cr.left < cr.right && cr.top < cr.bottom)
         {
+          ch->SetCurPainter(m_curPainter);
           ch->OnPaint(drawbm,m_position.left+origin_x,m_position.top+origin_y,&cr);
+          ch->SetCurPainter(NULL);
         }
       }
     }
@@ -710,7 +738,9 @@ void WDL_VWnd::OnPaintOver(LICE_IBitmap *drawbm, int origin_x, int origin_y, REC
 
         if (cr.left < cr.right && cr.top < cr.bottom)
         {
+          ch->SetCurPainter(m_curPainter);
           ch->OnPaintOver(drawbm,m_position.left+origin_x,m_position.top+origin_y,&cr);
+          ch->SetCurPainter(NULL);
         }
       }
     }
@@ -781,11 +811,12 @@ int WDL_VWnd::OnMouseDown(int xpos, int ypos) // returns TRUE if handled
   }  
   RECT r;
   wnd->GetPosition(&r);
+  WDL_VWND_DCHK(chk);
   int a;
   if ((a=wnd->OnMouseDown(xpos-r.left,ypos-r.top)))
   {
     if (a<0) return -1;
-    m_captureidx=m_children->Find(wnd);
+    if (chk.isOK()) m_captureidx=m_children->Find(wnd);
     return 1;
   }
   return false;
@@ -837,6 +868,7 @@ void WDL_VWnd::OnMouseMove(int xpos, int ypos)
 
   WDL_VWnd *wnd=m_children->Get(m_captureidx);
   
+  WDL_VWND_DCHK(chk);
   if (!wnd) 
   {
     wnd=VirtWndFromPoint(xpos,ypos,0);
@@ -852,7 +884,7 @@ void WDL_VWnd::OnMouseMove(int xpos, int ypos)
           t->GetPosition(&r);
           t->OnMouseMove(xpos-r.left,ypos-r.top);
         }
-        m_lastmouseidx=idx;
+        if (chk.isOK()) m_lastmouseidx=idx;
       }
     }
     else
@@ -864,11 +896,11 @@ void WDL_VWnd::OnMouseMove(int xpos, int ypos)
         t->GetPosition(&r);
         t->OnMouseMove(xpos-r.left,ypos-r.top);
       }
-      m_lastmouseidx=-1;
+      if (chk.isOK()) m_lastmouseidx=-1;
     }
   }
 
-  if (wnd) 
+  if (wnd && chk.isOK()) 
   {
     RECT r;
     wnd->GetPosition(&r);
@@ -1221,15 +1253,15 @@ static void __VirtClipBlit(int clipx, int clipy, int clipright, int clipbottom,
     return; // dont draw if fully outside
   }
 
-  float srcx = (float) _srcx;
-  float srcy = (float) _srcy;
-  float srcw = (float) _srcw;
-  float srch = (float) _srch;
+  double srcx = (double) _srcx;
+  double srcy = (double) _srcy;
+  double srcw = (double) _srcw;
+  double srch = (double) _srch;
 
   if (dstx < clipx || dsty < clipy || dstx+dstw > clipright || dsty+dsth > clipbottom) 
   {
-    float xsc=srcw/dstw;
-    float ysc=srch/dsth;
+    double xsc=srcw/dstw;
+    double ysc=srch/dsth;
 
     if (dstx<clipx)
     {
@@ -1263,7 +1295,12 @@ static void __VirtClipBlit(int clipx, int clipy, int clipright, int clipbottom,
   }
 
   if (dstw>0&&dsth>0)
-    LICE_ScaledBlit(dest,src,dstx,dsty,dstw,dsth,srcx,srcy,srcw,srch,alpha,mode);
+  {
+    const double eps=0.0005;
+    if (srcw > 0.0 && srcw < eps) srcw=eps;
+    if (srch > 0.0 && srch < eps) srch=eps;
+    LICE_ScaledBlit(dest,src,dstx,dsty,dstw,dsth,(float)srcx,(float)srcy,(float)srcw,(float)srch,alpha,mode);
+  }
 }
 
 void WDL_VirtualWnd_ScaledBlitSubBG(LICE_IBitmap *dest,
@@ -1373,6 +1410,9 @@ void WDL_VirtualWnd_ScaledBlitBG(LICE_IBitmap *dest,
   if (bottom_margin_out>0) 
     nbpass = 4;
 
+  bool no_inside = !!(mode & WDL_VWND_SCALEDBLITBG_IGNORE_INSIDE);
+  bool no_outside = !!(mode & WDL_VWND_SCALEDBLITBG_IGNORE_OUTSIDE);
+
   bool no_lr=!!(mode & WDL_VWND_SCALEDBLITBG_IGNORE_LR);
 
 
@@ -1416,8 +1456,12 @@ void WDL_VirtualWnd_ScaledBlitBG(LICE_IBitmap *dest,
         clipbottom += bottom_margin_out;
       break;
     }
-    
-    if (outh > 0 && inh > 0)
+    bool is_outer = pass<0 || pass>=3;
+
+    if (no_outside && is_outer)
+    {
+    }
+    else if (outh > 0 && inh > 0)
     {
 
       if (no_lr)
@@ -1431,33 +1475,36 @@ void WDL_VirtualWnd_ScaledBlitBG(LICE_IBitmap *dest,
       else
       {
         // left 
-        if (left_margin_out>0)
+        if (left_margin_out>0 && !no_outside)
         {
           __VirtClipBlit(clipx-left_margin_out,this_clipy,clipright,clipbottom,dest,src->bgimage,destx-left_margin_out,outy,left_margin_out,outh,
                                1,iny,left_margin_out,inh,alpha,
                                (no_alpha_flags&1) ? (mode&~LICE_BLIT_USE_ALPHA) :  mode);
         }
 
-        if (left_margin > 0)
-          __VirtClipBlit(clipx,this_clipy,clipright,clipbottom,dest,src->bgimage,destx,outy,left_margin,outh,
-                               1+left_margin_out,iny,src->bgimage_lt[0]-1,inh,alpha,
-                               (no_alpha_flags&1) ? (mode&~LICE_BLIT_USE_ALPHA) :  mode);
+        if (!no_inside||is_outer)
+        {
+          if (left_margin > 0)
+            __VirtClipBlit(clipx,this_clipy,clipright,clipbottom,dest,src->bgimage,destx,outy,left_margin,outh,
+                                 1+left_margin_out,iny,src->bgimage_lt[0]-1,inh,alpha,
+                                 (no_alpha_flags&1) ? (mode&~LICE_BLIT_USE_ALPHA) :  mode);
 
 
-        // center
-        __VirtClipBlit(clipx,this_clipy,clipright,clipbottom,dest,src->bgimage,destx+left_margin,outy,
-                                destw-right_margin-left_margin,outh,
-                             src->bgimage_lt[0]+left_margin_out,iny,
-                             sw-src->bgimage_lt[0]-src->bgimage_rb[0]-right_margin_out-left_margin_out,
-                             inh,alpha,(no_alpha_flags&2) ? (mode&~LICE_BLIT_USE_ALPHA) :  mode);
-        // right
-        if (right_margin > 0)
-          __VirtClipBlit(clipx,this_clipy,clipright,clipbottom,dest,src->bgimage,destx+destw-right_margin,outy, right_margin,outh,
-                               sw-src->bgimage_rb[0]-right_margin_out,iny,
-                               src->bgimage_rb[0]-1,inh,alpha,(no_alpha_flags&4) ? (mode&~LICE_BLIT_USE_ALPHA) :  mode); 
+          // center
+          __VirtClipBlit(clipx,this_clipy,clipright,clipbottom,dest,src->bgimage,destx+left_margin,outy,
+                                  destw-right_margin-left_margin,outh,
+                               src->bgimage_lt[0]+left_margin_out,iny,
+                               sw-src->bgimage_lt[0]-src->bgimage_rb[0]-right_margin_out-left_margin_out,
+                               inh,alpha,(no_alpha_flags&2) ? (mode&~LICE_BLIT_USE_ALPHA) :  mode);
+          // right
+          if (right_margin > 0)
+            __VirtClipBlit(clipx,this_clipy,clipright,clipbottom,dest,src->bgimage,destx+destw-right_margin,outy, right_margin,outh,
+                                 sw-src->bgimage_rb[0]-right_margin_out,iny,
+                                 src->bgimage_rb[0]-1,inh,alpha,(no_alpha_flags&4) ? (mode&~LICE_BLIT_USE_ALPHA) :  mode); 
+        }
 
         // right outside area
-        if (right_margin_out>0)
+        if (right_margin_out>0 && !no_outside)
           __VirtClipBlit(clipx,this_clipy,clipright+right_margin_out,clipbottom,dest,src->bgimage,destx+destw,outy,right_margin_out,outh,
             sw-right_margin_out-1,iny,
             right_margin_out,inh,alpha,(no_alpha_flags&8) ? (mode&~LICE_BLIT_USE_ALPHA) :  mode); 

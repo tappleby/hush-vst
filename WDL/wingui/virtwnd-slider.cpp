@@ -30,6 +30,7 @@
 
 WDL_VirtualSlider::WDL_VirtualSlider()
 {
+  m_knobbias=0;
   m_zl_color = m_knob_color=0;
   m_is_knob=false;
   m_tl_extra=m_br_extra=0;
@@ -53,9 +54,9 @@ bool WDL_VirtualSlider::GetIsVert()
   return m_position.right-m_position.left < m_position.bottom-m_position.top;
 }
 
-static void AdjustThumbImageSize(int wndw, int wndh, WDL_VirtualSlider_SkinConfig *a, bool vert, int *bmw, int *bmh, int *startoffs=NULL, bool *want_knob=NULL)
+static void AdjustThumbImageSize(int wndw, int wndh, WDL_VirtualSlider_SkinConfig *a, bool vert, int *bmw, int *bmh, int *startoffs=NULL, bool *want_knob=NULL, int knob_bias=0)
 {
-  if (want_knob) *want_knob=false;
+  if (want_knob) *want_knob=knob_bias>0;
   if (a) 
   {
     int ret=a->thumbimage_rb[vert] - a->thumbimage_lt[vert];
@@ -76,7 +77,7 @@ static void AdjustThumbImageSize(int wndw, int wndh, WDL_VirtualSlider_SkinConfi
   }
   if (vert)
   {
-    if (want_knob && *bmh >= wndh*3/4) *want_knob=true;
+    if (want_knob && *bmh >= wndh*3/4 && !knob_bias) *want_knob=true;
     if (*bmh > wndh/2)
     {
       if (startoffs) *startoffs += (*bmh - wndh/2)/2;
@@ -85,7 +86,7 @@ static void AdjustThumbImageSize(int wndw, int wndh, WDL_VirtualSlider_SkinConfi
   }
   else
   {
-    if (want_knob && *bmw >= wndw*3/4) *want_knob=true;
+    if (want_knob && *bmw >= wndw*3/4 && !knob_bias) *want_knob=true;
     if (*bmw > wndw/2)
     {
       if (startoffs) *startoffs += (*bmw - wndw/2)/2;
@@ -171,7 +172,7 @@ void WDL_VirtualSlider::OnPaint(LICE_IBitmap *drawbm, int origin_x, int origin_y
   {
     bm_w2=bm_w=bm_image->getWidth();
     bm_h2=bm_h=bm_image->getHeight();
-    AdjustThumbImageSize(vieww,viewh,m_skininfo,isVert,&bm_w2,&bm_h2,&imgoffset,&wantKnob);
+    AdjustThumbImageSize(vieww,viewh,m_skininfo,isVert,&bm_w2,&bm_h2,&imgoffset,&wantKnob,m_knobbias);
   }
   else
   {
@@ -181,7 +182,7 @@ void WDL_VirtualSlider::OnPaint(LICE_IBitmap *drawbm, int origin_x, int origin_y
       bm_w2=bm_w=bm_image->getWidth();
       bm_h2=bm_h=bm_image->getHeight();
     }
-    AdjustThumbImageSize(vieww,viewh,NULL,isVert,&bm_w2,&bm_h2,&imgoffset,&wantKnob);
+    AdjustThumbImageSize(vieww,viewh,NULL,isVert,&bm_w2,&bm_h2,&imgoffset,&wantKnob,m_knobbias);
   }
 
   float alpha = (m_grayed ? 0.25f : 1.0f);
@@ -241,7 +242,7 @@ void WDL_VirtualSlider::OnPaint(LICE_IBitmap *drawbm, int origin_x, int origin_y
 
         int y=((m_maxr-center)*(viewh-bm_h2))/rsize + ((bm_h-1)/2-imgoffset);
 
-        if (!zlc) zlc = LICE_RGBA_FROMNATIVE(WDL_STYLE_GetSysColor(COLOR_BTNTEXT),255);
+        if (!zlc) zlc = LICE_RGBA_FROMNATIVE(GSC(COLOR_BTNTEXT),255);
         LICE_Line(drawbm,origin_x+2,origin_y+y,origin_x+vieww-2,origin_y+y, zlc, LICE_GETA(zlc)/255.0, LICE_BLIT_MODE_COPY,false);
       }
 
@@ -249,9 +250,9 @@ void WDL_VirtualSlider::OnPaint(LICE_IBitmap *drawbm, int origin_x, int origin_y
       if (!back_image)
       {
 
-        LICE_pixel fgcol  = WDL_STYLE_GetSysColor(COLOR_3DHILIGHT);
+        LICE_pixel fgcol  = GSC(COLOR_3DHILIGHT);
         fgcol = LICE_RGBA_FROMNATIVE(fgcol,255);
-        LICE_pixel bgcol=WDL_STYLE_GetSysColor(COLOR_3DSHADOW);
+        LICE_pixel bgcol=GSC(COLOR_3DSHADOW);
         if (m_bgcol1_msg)
           SendCommand(m_bgcol1_msg,(INT_PTR)&bgcol,GetID(),this);
         bgcol = LICE_RGBA_FROMNATIVE(bgcol,255);
@@ -300,7 +301,7 @@ void WDL_VirtualSlider::OnPaint(LICE_IBitmap *drawbm, int origin_x, int origin_y
     }
     else
     {
-      LICE_pixel col  = m_knob_color ? m_knob_color : LICE_RGBA_FROMNATIVE(WDL_STYLE_GetSysColor(COLOR_3DHILIGHT),255);
+      LICE_pixel col  = m_knob_color ? m_knob_color : LICE_RGBA_FROMNATIVE(GSC(COLOR_3DHILIGHT),255);
 
       float alpha = LICE_GETA(col)/255.0f;
       int cx=origin_x+vieww/2;
@@ -369,7 +370,7 @@ void WDL_VirtualSlider::OnPaint(LICE_IBitmap *drawbm, int origin_x, int origin_y
 
       int x=((center-m_minr)*(vieww-bm_w2))/rsize + bm_w/2 - imgoffset;
 
-      if (!zlc) zlc = LICE_RGBA_FROMNATIVE(WDL_STYLE_GetSysColor(COLOR_BTNTEXT),255);
+      if (!zlc) zlc = LICE_RGBA_FROMNATIVE(GSC(COLOR_BTNTEXT),255);
 
       LICE_Line(drawbm,origin_x+x,origin_y+2,origin_x+x,origin_y+viewh-2,
         zlc, LICE_GETA(zlc)/255.0, LICE_BLIT_MODE_COPY,false);
@@ -377,9 +378,9 @@ void WDL_VirtualSlider::OnPaint(LICE_IBitmap *drawbm, int origin_x, int origin_y
 
     if (!back_image)
     {
-      LICE_pixel fgcol  = WDL_STYLE_GetSysColor(COLOR_3DHILIGHT);
+      LICE_pixel fgcol  = GSC(COLOR_3DHILIGHT);
       fgcol = LICE_RGBA_FROMNATIVE(fgcol,255);
-      LICE_pixel bgcol=WDL_STYLE_GetSysColor(COLOR_3DSHADOW);
+      LICE_pixel bgcol=GSC(COLOR_3DSHADOW);
       if (m_bgcol1_msg)
         SendCommand(m_bgcol1_msg,(INT_PTR)&bgcol,GetID(),this);
       bgcol = LICE_RGBA_FROMNATIVE(bgcol,255);
@@ -436,7 +437,7 @@ void WDL_VirtualSlider::OnPaint(LICE_IBitmap *drawbm, int origin_x, int origin_y
 
 }
 
-static int m_move_offset;
+static double m_move_offset;
 static int m_click_pos,m_last_y,m_last_x, m_last_precmode;
 
 
@@ -444,6 +445,8 @@ int WDL_VirtualSlider::OnMouseDown(int xpos, int ypos)
 {
   if (m_grayed) return false;
   m_needflush=0;
+
+  if (m__iaccess) m__iaccess->OnFocused();
 
   bool isVert = GetIsVert();
   int rsize=m_maxr-m_minr;
@@ -461,7 +464,7 @@ int WDL_VirtualSlider::OnMouseDown(int xpos, int ypos)
   {
     bm_w=bm_image->getWidth();
     bm_h=bm_image->getHeight();
-    AdjustThumbImageSize(vieww,viewh,m_skininfo,isVert,&bm_w,&bm_h,NULL,&wantKnob);
+    AdjustThumbImageSize(vieww,viewh,m_skininfo,isVert,&bm_w,&bm_h,NULL,&wantKnob,m_knobbias);
   }
   else
   {
@@ -471,23 +474,26 @@ int WDL_VirtualSlider::OnMouseDown(int xpos, int ypos)
       bm_w=bm_image->getWidth();
       bm_h=bm_image->getHeight();
     }
-    AdjustThumbImageSize(vieww,viewh,NULL,isVert,&bm_w,&bm_h,NULL,&wantKnob);
+    AdjustThumbImageSize(vieww,viewh,NULL,isVert,&bm_w,&bm_h,NULL,&wantKnob,m_knobbias);
   }
 
   m_is_knob = wantKnob;
-
-  if (m_is_knob) isVert=true;
 
   m_last_y=ypos;    
   m_last_x=xpos;
   m_last_precmode=0;
 
   bool needsendcmd = m_sendmsgonclick;
-  if (isVert)
+  if (m_is_knob)
   {
-    m_move_offset=ypos-( viewh - bm_h - (((m_pos-m_minr) * (viewh-bm_h))/rsize));
+    m_move_offset=0;
     m_click_pos=m_pos;
-    if (m_move_offset < 0 || m_move_offset >= bm_h)
+  }
+  else if (isVert)
+  {
+    m_move_offset=ypos-( viewh - bm_h - ((double)((m_pos-m_minr) * (viewh-bm_h))/(double)rsize));
+    m_click_pos=m_pos;
+    if (!m_is_knob && (m_move_offset < 0 || m_move_offset >= bm_h))
     {
       int xcent=xpos - vieww/2;
       bool hit;
@@ -510,15 +516,20 @@ int WDL_VirtualSlider::OnMouseDown(int xpos, int ypos)
         m_pos=pos;
 
         needsendcmd=false;
+        WDL_VWND_DCHK(chk);
         SendCommand(m_scrollmsg?m_scrollmsg:WM_VSCROLL,SB_THUMBTRACK,GetID(),this);
-        RequestRedraw(NULL);
+        if (chk.isOK()) 
+        {
+          RequestRedraw(NULL);
+          if (m__iaccess) m__iaccess->OnStateChange();
+        }
       }
       else return false;
     }
   }
   else
   {
-    m_move_offset=xpos-( (((m_pos-m_minr) * (vieww-bm_w))/rsize));
+    m_move_offset=xpos-( ((double)((m_pos-m_minr) * (vieww-bm_w))/(double)rsize));
     m_click_pos=m_pos;
     if (m_move_offset < 0 || m_move_offset >= bm_w)
     {
@@ -543,8 +554,13 @@ int WDL_VirtualSlider::OnMouseDown(int xpos, int ypos)
         m_pos=pos;
 
         needsendcmd=false;
+        WDL_VWND_DCHK(chk);
         SendCommand(m_scrollmsg?m_scrollmsg:WM_HSCROLL,SB_THUMBTRACK,GetID(),this);
-        RequestRedraw(NULL);
+        if (chk.isOK())
+        {
+          RequestRedraw(NULL);
+          if (m__iaccess) m__iaccess->OnStateChange();
+        }
       }
       else return false;
     }
@@ -552,7 +568,11 @@ int WDL_VirtualSlider::OnMouseDown(int xpos, int ypos)
 
   m_captured=true;
   if (needsendcmd)
+  {
+    WDL_VWND_DCHK(chk);
     SendCommand(m_scrollmsg?m_scrollmsg:WM_VSCROLL,SB_THUMBTRACK,GetID(),this);
+    if (chk.isOK() && m__iaccess) m__iaccess->OnStateChange();
+  }
   return 1;
 }
 
@@ -603,7 +623,7 @@ void WDL_VirtualSlider::OnMoveOrUp(int xpos, int ypos, int isup)
     }
     else 
     {
-      pos=m_minr+ (((viewh-bm_h - ypos + m_move_offset)*rsize)/(viewh-bm_h));
+      pos=m_minr+ (((double)(viewh-bm_h - ypos + m_move_offset)*(double)rsize)/(double)(viewh-bm_h));
     }
     if (pos < m_minr)pos=m_minr;
     else if (pos > m_maxr)pos=m_maxr;
@@ -621,8 +641,13 @@ void WDL_VirtualSlider::OnMoveOrUp(int xpos, int ypos, int isup)
 
       if (isup || ypos != m_last_y||(m_is_knob&&xpos!=m_last_x))
       {
+        WDL_VWND_DCHK(chk);
         SendCommand(m_scrollmsg?m_scrollmsg:WM_VSCROLL,isup?SB_ENDSCROLL:SB_THUMBTRACK,GetID(),this);
-        RequestRedraw(NULL);
+        if (chk.isOK())
+        {
+          RequestRedraw(NULL);
+          if (m__iaccess) m__iaccess->OnStateChange();
+        }
       }
     }
   }
@@ -639,7 +664,7 @@ void WDL_VirtualSlider::OnMoveOrUp(int xpos, int ypos, int isup)
     }
     else 
     {
-      pos=m_minr + (((xpos - m_move_offset)*rsize)/(vieww-bm_w));
+      pos=m_minr + (((double)(xpos - m_move_offset)*(double)rsize)/(double)(vieww-bm_w));
     }
     if (pos < m_minr)pos=m_minr;
     else if (pos > m_maxr)pos=m_maxr;
@@ -656,8 +681,13 @@ void WDL_VirtualSlider::OnMoveOrUp(int xpos, int ypos, int isup)
 
       if (isup || xpos != m_last_x)
       {
+        WDL_VWND_DCHK(chk);
         SendCommand(m_scrollmsg?m_scrollmsg:WM_HSCROLL,isup?SB_ENDSCROLL:SB_THUMBTRACK,GetID(),this);
-        RequestRedraw(NULL);
+        if (chk.isOK())
+        {
+          RequestRedraw(NULL);
+          if (m__iaccess) m__iaccess->OnStateChange();
+        }
       }
     }
   }
@@ -729,7 +759,9 @@ void WDL_VirtualSlider::OnMouseMove(int xpos, int ypos)
   {
     bool isVert = GetIsVert();
     m_needflush=0;
+    WDL_VWND_DCHK(chk);
     SendCommand(m_scrollmsg?m_scrollmsg:(isVert?WM_VSCROLL:WM_HSCROLL),SB_ENDSCROLL,GetID(),this);
+    if (chk.isOK() && m__iaccess) m__iaccess->OnStateChange();
   }
 }
 
@@ -753,9 +785,14 @@ bool WDL_VirtualSlider::OnMouseDblClick(int xpos, int ypos)
   int pos=m_center;
   if (pos < 0) pos=WDL_STYLE_GetSliderDynamicCenterPos();
   m_pos=pos;
+  WDL_VWND_DCHK(chk);
   SendCommand(m_scrollmsg?m_scrollmsg:(isVert?WM_VSCROLL:WM_HSCROLL),SB_ENDSCROLL,GetID(),this);
 
-  RequestRedraw(NULL);
+  if (chk.isOK())
+  {
+    RequestRedraw(NULL);
+    if (m__iaccess) m__iaccess->OnStateChange();
+  }
   
   m_captured=false;
   return true;
@@ -781,10 +818,14 @@ bool WDL_VirtualSlider::OnMouseWheel(int xpos, int ypos, int amt)
   m_pos=pos;
 
   m_needflush=1;
+  WDL_VWND_DCHK(chk);
   SendCommand(m_scrollmsg?m_scrollmsg:(isVert?WM_VSCROLL:WM_HSCROLL),SB_THUMBTRACK,GetID(),this);
 
-  RequestRedraw(NULL);
-
+  if (chk.isOK())
+  {
+    RequestRedraw(NULL);
+    if (m__iaccess) m__iaccess->OnStateChange();
+  }
   return true;
 }
 
@@ -826,7 +867,7 @@ void WDL_VirtualSlider::GetPositionPaintExtent(RECT *r)
     int bm_w2=bm_w;
     int bm_h2=bm_h;
     bool wantKnob=false;
-    AdjustThumbImageSize(m_position.right-m_position.left,m_position.bottom-m_position.top,m_skininfo,isVert,&bm_w,&bm_h,&s,&wantKnob);
+    AdjustThumbImageSize(m_position.right-m_position.left,m_position.bottom-m_position.top,m_skininfo,isVert,&bm_w,&bm_h,&s,&wantKnob,m_knobbias);
     if (wantKnob) return;
 
     int rsize=m_maxr-m_minr;

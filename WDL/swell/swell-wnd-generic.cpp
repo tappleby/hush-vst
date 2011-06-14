@@ -594,6 +594,12 @@ LONG_PTR GetWindowLong(HWND hwnd, int idx)
 }
 
 
+bool IsWindow(HWND hwnd)
+{
+  // todo: verify window is valid (somehow)
+  return !!hwnd;
+}
+
 bool IsWindowVisible(HWND hwnd)
 {
   if (!hwnd) return false;
@@ -2583,16 +2589,21 @@ void ImageList_Destroy(HIMAGELIST list)
   delete p;
 }
 
-void ImageList_ReplaceIcon(HIMAGELIST list, int offset, HICON image)
+int ImageList_ReplaceIcon(HIMAGELIST list, int offset, HICON image)
 {
-  if (!image || !list) return;
+  if (!image || !list) return -1;
   WDL_PtrList<HGDIOBJ__> *l=(WDL_PtrList<HGDIOBJ__> *)list;
-  if (offset<0||offset>=l->GetSize()) l->Add(image);
+  if (offset<0||offset>=l->GetSize()) 
+  {
+    l->Add(image);
+    offset=l->GetSize()-1;
+  }
   else
   {
     HICON old=l->Get(offset);
     l->Set(offset,image);
   }
+  return offset;
 }
 
 
@@ -2999,6 +3010,54 @@ BOOL SWELL_GetGestureInfo(LPARAM lParam, GESTUREINFO* gi)
 
 void SWELL_SetWindowWantRaiseAmt(HWND h, int  amt)
 {
+}
+int SWELL_GetWindowWantRaiseAmt(HWND h)
+{
+  return 0;
+}
+
+// copied from swell-wnd.mm, can maybe have a common impl instead
+void SWELL_GenerateDialogFromList(const void *_list, int listsz)
+{
+#define SIXFROMLIST list->p1,list->p2,list->p3, list->p4, list->p5, list->p6
+  SWELL_DlgResourceEntry *list = (SWELL_DlgResourceEntry*)_list;
+  while (listsz>0)
+  {
+    if (!strcmp(list->str1,"__SWELL_BUTTON"))
+    {
+      SWELL_MakeButton(list->flag1,list->str2, SIXFROMLIST);
+    } 
+    else if (!strcmp(list->str1,"__SWELL_EDIT"))
+    {
+      SWELL_MakeEditField(SIXFROMLIST);
+    }
+    else if (!strcmp(list->str1,"__SWELL_COMBO"))
+    {
+      SWELL_MakeCombo(SIXFROMLIST);
+    }
+    else if (!strcmp(list->str1,"__SWELL_LISTBOX"))
+    {
+      SWELL_MakeListBox(SIXFROMLIST);
+    }
+    else if (!strcmp(list->str1,"__SWELL_GROUP"))
+    {
+      SWELL_MakeGroupBox(list->str2,SIXFROMLIST);
+    }
+    else if (!strcmp(list->str1,"__SWELL_CHECKBOX"))
+    {
+      SWELL_MakeCheckBox(list->str2,SIXFROMLIST);
+    }
+    else if (!strcmp(list->str1,"__SWELL_LABEL"))
+    {
+      SWELL_MakeLabel(list->flag1, list->str2, SIXFROMLIST);
+    }
+    else if (*list->str2)
+    {
+      SWELL_MakeControl(list->str1, list->flag1, list->str2, SIXFROMLIST);
+    }
+    listsz--;
+    list++;
+  }
 }
 
 #endif

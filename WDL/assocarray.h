@@ -8,7 +8,7 @@
 // if keydup/keydispose are set, copies of (any) key data will be made/destroyed as necessary
 
 
-// WDL_AssocArrayImpl can be used on its own, and can contain structs for values
+// WDL_AssocArrayImpl can be used on its own, and can contain structs for keys or values
 template <class KEY, class VAL> class WDL_AssocArrayImpl 
 {
 public:
@@ -20,7 +20,7 @@ public:
     m_keydispose = keydispose;
     m_valdispose = valdispose;
   }
- 
+
   ~WDL_AssocArrayImpl() 
   {
     DeleteAll();
@@ -124,16 +124,16 @@ public:
     }
     return 0;
   }
-
-  KEY ReverseLookup(VAL val, KEY notfound=0)
+  
+  KEY* ReverseLookupPtr(VAL val)
   {
     int i;
     for (i = 0; i < m_data.GetSize(); ++i)
     {
       KeyVal* kv = m_data.Get()+i;
-      if (kv->val == val) return kv->key;
+      if (kv->val == val) return &kv->key;
     }
-    return notfound;
+    return 0;    
   }
 
   void ChangeKey(KEY oldkey, KEY newkey)
@@ -162,9 +162,23 @@ public:
 
   void Resort()
   {
-    if (m_data.GetSize()>1 && m_keycmp)
+    if (m_data.GetSize() > 1 && m_keycmp)
     {
       qsort(m_data.Get(),m_data.GetSize(),sizeof(KeyVal),(int(*)(const void *,const void *))m_keycmp);
+
+      // AddUnsorted can add duplicate keys
+      // unfortunately qsort is not guaranteed to preserve order,
+      // ideally this filter would always preserve the last-added key
+      int i;
+      for (i=0; i < m_data.GetSize()-1; ++i)
+      {
+        KeyVal* kv=m_data.Get()+i;
+        KeyVal* nv=kv+1;
+        if (!m_keycmp(&kv->key, &nv->key))
+        {
+          DeleteByIndex(i--);
+        }
+      }
     }
   }
 
@@ -175,7 +189,8 @@ public:
     while (a != c)
     {
       int b = (a+c)/2;
-      int cmp = m_keycmp(&key, &m_data.Get()[b].key);
+      KeyVal* kv=m_data.Get()+b;
+      int cmp = m_keycmp(&key, &kv->key);
       if (cmp > 0) a = b+1;
       else if (cmp < 0) c = b;
       else
@@ -196,6 +211,11 @@ public:
     return -1;
   }
 
+  void SetGranul(int gran)
+  {
+    m_data.SetGranul(gran);
+  }
+
 private:
 
   struct KeyVal
@@ -213,7 +233,7 @@ private:
 };
 
 
-// WDL_AssocArray adds useful functions but cannot contain structs for values
+// WDL_AssocArray adds useful functions but cannot contain structs for keys or values
 template <class KEY, class VAL> class WDL_AssocArray : public WDL_AssocArrayImpl<KEY, VAL>
 {
 public:
@@ -235,6 +255,13 @@ public:
     VAL* p = EnumeratePtr(i, key);
     if (p) return *p;
     return notfound; 
+  }
+
+  KEY ReverseLookup(VAL val, KEY notfound=0)
+  {
+    KEY* p=ReverseLookupPtr(val);
+    if (p) return *p;
+    return notfound;
   }
 };
 
