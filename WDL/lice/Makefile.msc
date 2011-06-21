@@ -1,5 +1,5 @@
 # LICE makefile for Microsoft Windows SDK v7.0/v7.1
-# (c) Theo Niessink 2009, 2010
+# (c) Theo Niessink 2009-2011
 # <http://www.taletn.com/>
 #
 # This file is provided 'as-is', without any express or implied warranty. In
@@ -120,10 +120,13 @@ all : "$(OUTDIR)/lice.lib"
 
 ZLIB = \
 "$(INTDIR)/adler32.obj" \
-"$(INTDIR)/compress.obj" \
+#"$(INTDIR)/compress.obj" \
 "$(INTDIR)/crc32.obj" \
-"$(INTDIR)/deflate.obj" \
-"$(INTDIR)/gzio.obj" \
+#"$(INTDIR)/deflate.obj" \
+#"$(INTDIR)/gzlib.obj" \
+#"$(INTDIR)/gzread.obj" \
+#"$(INTDIR)/gzwrite.obj" \
+#"$(INTDIR)/gzclose.obj" \
 "$(INTDIR)/infback.obj" \
 "$(INTDIR)/inffast.obj" \
 "$(INTDIR)/inflate.obj" \
@@ -135,40 +138,30 @@ ZLIB = \
 zlib : $(ZLIB)
 
 {../zlib}.c{$(INTDIR)}.obj :
-	@$(CPP) $(CPPFLAGS) "$<"
+	@$(CPP) $(CPPFLAGS) /D NO_GZCOMPRESS "$<"
 
 
 LIBPNG = \
 "$(INTDIR)/png.obj" \
 "$(INTDIR)/pngerror.obj" \
-"$(INTDIR)/pnggccrd.obj" \
 "$(INTDIR)/pngget.obj" \
 "$(INTDIR)/pngmem.obj" \
-"$(INTDIR)/pngpread.obj" \
+#"$(INTDIR)/pngpread.obj" \
 "$(INTDIR)/pngread.obj" \
 "$(INTDIR)/pngrio.obj" \
 "$(INTDIR)/pngrtran.obj" \
 "$(INTDIR)/pngrutil.obj" \
 "$(INTDIR)/pngset.obj" \
 "$(INTDIR)/pngtrans.obj" \
-"$(INTDIR)/pngvcrd.obj" \
-"$(INTDIR)/pngwio.obj" \
-"$(INTDIR)/pngwrite.obj" \
-"$(INTDIR)/pngwtran.obj" \
-"$(INTDIR)/pngwutil.obj"
+#"$(INTDIR)/pngwio.obj" \
+#"$(INTDIR)/pngwrite.obj" \
+#"$(INTDIR)/pngwtran.obj" \
+#"$(INTDIR)/pngwutil.obj"
 
 libpng : $(LIBPNG)
 
-!IF "$(PLATFORM)" == "X64"
-LIBPNGFLAGS = /D "PNG_NO_ASSEMBLER_CODE"
-!ELSE
-LIBPNGFLAGS = /D "__MMX__" /D "PNG_HAVE_MMX_COMBINE_ROW" /D "PNG_HAVE_MMX_READ_INTERLACE" /D "PNG_HAVE_MMX_READ_FILTER_ROW"
-!ENDIF
-
-LIBPNGFLAGS = $(LIBPNGFLAGS) /I "../zlib" /D "PNG_LIBPNG_SPECIALBUILD" /D "PNG_USE_PNGVCRD"
-
 {../libpng}.c{$(INTDIR)}.obj :
-	@$(CPP) $(CPPFLAGS) $(LIBPNGFLAGS) "$<"
+	@$(CPP) $(CPPFLAGS) /I "../zlib" "$<"
 
 
 JPEGLIB = \
@@ -256,7 +249,7 @@ tinyxml : $(TINYXML)
 LICE = \
 "$(INTDIR)/lice.obj" \
 "$(INTDIR)/lice_arc.obj" \
-"$(INTDIR)/lice_bmp.obj" \
+#"$(INTDIR)/lice_bmp.obj" \
 #"$(INTDIR)/lice_colorspace.obj" \
 #"$(INTDIR)/lice_gif.obj" \
 #"$(INTDIR)/lice_gl_ctx.obj" \
@@ -277,7 +270,7 @@ LICE = \
 lice : $(LICE)
 
 .cpp{$(INTDIR)}.obj :
-	@$(CPP) $(CPPFLAGS) "$<"
+	@$(CPP) $(CPPFLAGS) /wd4244 "$<"
 
 
 LIB = \
