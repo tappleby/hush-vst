@@ -600,6 +600,7 @@ __attribute__ ((visibility ("default"))) BOOL WINAPI DllMain(HINSTANCE hInstDLL,
 #define MB_YESNO 4
 #define MB_RETRYCANCEL 5
 
+#define MB_ICONERROR 0
 #define MB_ICONSTOP 0
 #define MB_ICONINFORMATION 0
 
@@ -749,10 +750,8 @@ __attribute__ ((visibility ("default"))) BOOL WINAPI DllMain(HINSTANCE hInstDLL,
 #define LVN_ODFINDITEM          (LVN_FIRST-52)
 #define LVN_GETDISPINFO         (LVN_FIRST-50)
 
-// ignored for now
-#define LVS_EX_FULLROWSELECT 0
-
-
+#define LVS_EX_FULLROWSELECT 0 // ignored for now
+#define LVS_EX_GRIDLINES 1
 
 #define TCIF_TEXT               0x0001
 #define TCIF_IMAGE              0x0002

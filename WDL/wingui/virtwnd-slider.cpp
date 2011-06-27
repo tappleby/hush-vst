@@ -30,6 +30,7 @@
 
 WDL_VirtualSlider::WDL_VirtualSlider()
 {
+  m_knob_lineextrasize=0;
   m_knobbias=0;
   m_zl_color = m_knob_color=0;
   m_is_knob=false;
@@ -306,7 +307,7 @@ void WDL_VirtualSlider::OnPaint(LICE_IBitmap *drawbm, int origin_x, int origin_y
       float alpha = LICE_GETA(col)/255.0f;
       int cx=origin_x+vieww/2;
       int cy=origin_y+viewh/2;
-      float rd = vieww/2-4;
+      float rd = vieww/2-4 + m_knob_lineextrasize;
       float r2=rd*0.125f;
       if (!back_image) LICE_Circle(drawbm, cx, cy, rd, col, alpha, LICE_BLIT_MODE_COPY, true);
 
@@ -314,7 +315,7 @@ void WDL_VirtualSlider::OnPaint(LICE_IBitmap *drawbm, int origin_x, int origin_y
       
       int center=m_center;
       if (center < 0) center=WDL_STYLE_GetSliderDynamicCenterPos();
-      if (m_pos < center) val = (m_pos-center) / (double)(center-m_minr);
+      if (center > m_minr && (m_pos < center || center >= m_maxr)) val = (m_pos-center) / (double)(center-m_minr);
       else val = (m_pos-center) / (double)(m_maxr-center);
       #define KNOBANGLE_MAX (3.14159*7.0/8.0);
       float a = val*KNOBANGLE_MAX;
