@@ -1206,53 +1206,48 @@ class _LICE_Fill
 public:
 
   // da, db are [0..65536]
-  static void FillClippedTrapezoid(LICE_IBitmap* dest, int xa, int xb, int da, int db, int y1, int y2, LICE_pixel color, int aw
+  static void FillClippedTrapezoid(LICE_IBitmap* dest, int xa, int xb, int da, int db, int y1, int y2, int a, int b, int astep, int bstep, LICE_pixel color, int aw
 #ifdef LICE_FAVOR_SIZE_EXTREME
                           , LICE_COMBINEFUNC combFunc
 #endif
     )
   {
+    int wm1 = dest->getWidth()-1;
     int span = dest->getRowSpan();
-    LICE_pixel* px = dest->getBits()+y1*span+(int)xa;
+    LICE_pixel* px = dest->getBits()+y1*span;
     int cr = LICE_GETR(color), cg = LICE_GETG(color), cb = LICE_GETB(color), ca = LICE_GETA(color);
-    int ny = y2-y1;
-    int nx = (int)xb-(int)xa;    
-    int y, x;
+    int y = (y2-y1) + 1;
 
     if (!da && !db)
     {
-      for (y = 0; y <= ny; ++y)
+      if (xa<0)xa=0;
+      int cnt = min(xb,wm1)-xa + 1;    
+      if (cnt > 0) 
       {
-        LICE_pixel* xpx = px;
-        for (x = 0; x <= nx; ++x)
+        px+=xa;
+        while (y-->0)
         {
-          DOPIX((LICE_pixel_chan*)xpx, cr, cg, cb, ca, aw)
-          ++xpx;
+          LICE_pixel* xpx = px;
+          int x=cnt;
+          while (x--)
+          {
+            DOPIX((LICE_pixel_chan*)xpx, cr, cg, cb, ca, aw)
+            ++xpx;
+          }
+          px += span;
         }
-        px += span;
       }
       return;
     }
 
-    int a = 0;
-    int b = 0;
-    int astep = 1;
-    int bstep = 1;
-    if (da < 0)
-    {
-      da = -da;
-      astep = -1;
-    }
-    if (db < 0)
-    {
-      db = -db;
-      bstep = -1;
-    }
 
-    for (y = 0; y <= ny; ++y)
+    while (y-->0)
     {
-      LICE_pixel* xpx = px;
-      for (x = 0; x <= nx; ++x)
+      int x1=max(xa,0);
+      int x2=min(xb,wm1);
+      LICE_pixel* xpx = px + x1;
+      int cnt=x2-x1 + 1;
+      while (cnt-->0)
       {
         DOPIX((LICE_pixel_chan*)xpx, cr, cg, cb, ca, aw)
         ++xpx;
@@ -1262,15 +1257,17 @@ public:
       b += db;
       if (a >= 65536)
       {
-        int na = astep*a/65536;
-        px += na;
-        nx -= na;
+        int na = a/65536;
         a %= 65536;
+        if (astep<0)na=-na;
+        xa += na;
       }
       if (b >= 65536)
       {
-        nx += bstep*b/65536;
+        int nb = b/65536;
         b %= 65536;
+        if (bstep<0)nb=-nb;
+        xb += nb;
       }
       px += span;
     }
@@ -1283,50 +1280,44 @@ template <class COMBFUNC> class _LICE_FillFast
 public:
 
   // da, db are [0..65536]
-  static void FillClippedTrapezoidFAST(LICE_IBitmap* dest, int xa, int xb, int da, int db, int y1, int y2, LICE_pixel color)
+  static void FillClippedTrapezoidFAST(LICE_IBitmap* dest, int xa, int xb, int da, int db, int y1, int y2, int a, int b, int astep, int bstep, LICE_pixel color)
   {
+    int wm1 = dest->getWidth()-1;
     int span = dest->getRowSpan();
-    LICE_pixel* px = dest->getBits()+y1*span+(int)xa;
-    int ny = y2-y1;
-    int nx = (int)xb-(int)xa;    
-    int y, x;
+    LICE_pixel* px = dest->getBits()+y1*span;
+    int y = y2-y1 + 1;
 
     if (!da && !db)
     {
-      for (y = 0; y <= ny; ++y)
+      if (xa<0)xa=0;
+      int cnt = min(xb,wm1)-xa + 1;    
+      if (cnt > 0) 
       {
-        LICE_pixel* xpx = px;
-        for (x = 0; x <= nx; ++x)
+        px+=xa;
+        while (y-->0)
         {
-          COMBFUNC::doPixFAST(xpx, color);
-          ++xpx;
+          LICE_pixel* xpx = px;
+          int x=cnt;
+          while (x--)
+          {
+            COMBFUNC::doPixFAST(xpx, color);
+            ++xpx;
+          }
+          px += span;
         }
-        px += span;
       }
       return;
     }
 
-    int a = 32767;
-    int b = 32767;
-    int astep = 1;
-    int bstep = 1;
-    if (da < 0)
-    {
-      da = -da;
-      astep = -1;
-    }
-    if (db < 0)
-    {
-      db = -db;
-      bstep = -1;
-    }
  
-    for (y = 0; y <= ny; ++y)
+    while (y-->0)
     {
-      LICE_pixel* xpx = px;
-      for (x = 0; x <= nx; ++x)
+      int x1=max(xa,0);
+      int x2=min(xb,wm1);
+      LICE_pixel* xpx = px + x1;
+      int cnt=x2-x1 + 1;
+      while (cnt-->0)
       {
-        //assert(xpx >= dest->getBits() && xpx < dest->getBits()+dest->getHeight()*span);
         COMBFUNC::doPixFAST(xpx, color);
         ++xpx;
       }
@@ -1335,15 +1326,17 @@ public:
       b += db;
       if (a >= 65536)
       {
-        int na = astep*a/65536;
-        px += na;
-        nx -= na;
+        int na = a/65536;
         a %= 65536;
+        if (astep<0)na=-na;
+        xa += na;
       }
       if (b >= 65536)
       {
-        nx += bstep*b/65536;
+        int nb = b/65536;
         b %= 65536;
+        if (bstep<0)nb=-nb;
+        xb += nb;
       }
       px += span;
     }
@@ -1391,98 +1384,75 @@ void LICE_FillTrapezoid(LICE_IBitmap* dest, int x1a, int x1b, int y1, int x2a, i
   int w = dest->getWidth();
   int h = dest->getHeight();
 
-  if (x1b <= 0 && x2b <= 0) return;
+  if (x1b < 0 && x2b < 0) return;
   if (x1a >= w && x2a >= w) return;
 
   if (x1a <= 0 && x2a <= 0) x1a = x2a = 0;
   if (x1b >= w-1 && x2b >= w-1) x1b = x2b = w-1;
 
-  if (y1 < 0)
-  {
-    if (y2 < 0) return;
-    x1a = FindXOnSegment(x1a, y1, x2a, y2, 0);
-    x1b = FindXOnSegment(x1b, y1, x2b, y2, 0);
-    y1 = 0;
-  }
-
-  if (x1b < 0 || x2b < 0) // some scanlines are entirely offscreen left
-  {
-    int y = FindYOnSegment(x1b, y1, x2b, y2, 0); 
-    int xa = FindXOnSegment(x1a, y1, x2a, y2, y);
-    if (x2b < 0) 
-    {
-      x2a = xa;
-      x2b = 0;
-      y2 = y;
-    }
-    else 
-    {
-      x1a = xa;
-      x1b = 0;
-      y1 = y;
-    } 
-  }
-  if (x1a >= w || x2a >= w) // some scanlines are entirely offscreen right
-  {
-    int y = FindYOnSegment(x1a, y1, x2a, y2, w);
-    int xb = FindXOnSegment(x1b, y1, x2b, y2, y);
-    if (x2a >= w)
-    {
-      x2a = w;
-      x2b = xb;
-      y2 = y;
-    }
-    else
-    {
-      x1a = w;
-      x1b = xb;
-      y1 = y;
-    }
-  }
-
-  if (x1a < 0 || x2a < 0) // clip left
-  {
-    int y = FindYOnSegment(x1a, y1, x2a, y2, 0);
-    int xb = FindXOnSegment(x1b, y1, x2b, y2, y);
-    LICE_FillTrapezoid(dest, x1a, x1b, y1, 0, xb, y, color, alpha, mode);
-    LICE_FillTrapezoid(dest, 0, xb, y, x2a, x2b, y2, color, alpha, mode);
-    return;
-  }
-  if (x1b >= w || x2b >= w) // clip right
-  {
-    int y = FindYOnSegment(x1b, y1, x2b, y2, w-1);
-    int xa = FindXOnSegment(x1a, y1, x2a, y2, y);
-    LICE_FillTrapezoid(dest, x1a, x1b, y1, xa, w-1, y, color, alpha, mode);
-    LICE_FillTrapezoid(dest, xa, w-1, y, x2a, x2b, y2, color, alpha, mode);
-    return;
-  }
-
-  if (y1 > y2) return;
-  double idy = y2==y1 ? 0.0 : (65536.0/(y2-y1));
-  int dxady = (int)((x2a-x1a)*idy);
-  int dxbdy = (int)((x2b-x1b)*idy);
-  if (y2 > h-1) y2 = h-1;
+  if (y2 < 0 || y1 >= h) return;
 
   int aw = (int)(alpha*256.0f);
 
+  double idy = y2==y1 ? 0.0 : (65536.0/(y2-y1));
+  int dxady = (int)((x2a-x1a)*idy);
+  int dxbdy = (int)((x2b-x1b)*idy);
+
+  int a = 0;
+  int b = 0;
+  int astep = 1;
+  int bstep = 1;
+  if (dxady < 0)
+  {
+    dxady = -dxady;
+    astep = -1;
+  }
+  if (dxbdy < 0)
+  {
+    dxbdy = -dxbdy;
+    bstep = -1;
+  }
+  
+  if (y1<0)
+  {
+    a -= dxady*y1;
+    b -= dxbdy*y1;
+    y1=0;
+    if (a >= 65536)
+    {
+      int na = a/65536;
+      a %= 65536;
+      if (astep<0)na=-na;
+      x1a += na;
+    }
+    if (b >= 65536)
+    {
+      int nb = b/65536;
+      b %= 65536;
+      if (bstep<0)nb=-nb;
+      x1b += nb;
+    }
+  }
+  if (y2 > h-1) y2 = h-1;
+
   if ((mode&LICE_BLIT_MODE_MASK) == LICE_BLIT_MODE_COPY && aw==256)
   {
-    _LICE_FillFast<_LICE_CombinePixelsClobberFAST>::FillClippedTrapezoidFAST(dest, x1a, x1b, dxady, dxbdy, y1, y2, color);
+    _LICE_FillFast<_LICE_CombinePixelsClobberFAST>::FillClippedTrapezoidFAST(dest, x1a, x1b, dxady, dxbdy, y1, y2, a,b, astep,bstep, color);
   }
   else if ((mode&LICE_BLIT_MODE_MASK) == LICE_BLIT_MODE_COPY && aw==128)
   {
     color = (color>>1)&0x7f7f7f7f;
-    _LICE_FillFast<_LICE_CombinePixelsHalfMix2FAST>::FillClippedTrapezoidFAST(dest, x1a, x1b, dxady, dxbdy, y1, y2, color);
+    _LICE_FillFast<_LICE_CombinePixelsHalfMix2FAST>::FillClippedTrapezoidFAST(dest, x1a, x1b, dxady, dxbdy, y1, y2,a,b, astep,bstep, color);
   }
   else if ((mode&LICE_BLIT_MODE_MASK) == LICE_BLIT_MODE_COPY && aw==64)
   {
     color = (color>>2)&0x3f3f3f3f;
-    _LICE_FillFast<_LICE_CombinePixelsQuarterMix2FAST>::FillClippedTrapezoidFAST(dest, x1a, x1b, dxady, dxbdy, y1, y2, color);
+    _LICE_FillFast<_LICE_CombinePixelsQuarterMix2FAST>::FillClippedTrapezoidFAST(dest, x1a, x1b, dxady, dxbdy, y1, y2,a,b, astep,bstep, color);
   }
   else if ((mode&LICE_BLIT_MODE_MASK) == LICE_BLIT_MODE_COPY && aw==192)
   {
     color = ((color>>1)&0x7f7f7f7f)+((color>>2)&0x3f3f3f3f);
-    _LICE_FillFast<_LICE_CombinePixelsThreeQuarterMix2FAST>::FillClippedTrapezoidFAST(dest, x1a, x1b, dxady, dxbdy, y1, y2, color);
+    _LICE_FillFast<_LICE_CombinePixelsThreeQuarterMix2FAST>::FillClippedTrapezoidFAST(dest, x1a, x1b, dxady, dxbdy, y1, y2,a,b, astep,bstep, color);
   }
   else
   {
@@ -1491,13 +1461,13 @@ void LICE_FillTrapezoid(LICE_IBitmap* dest, int x1a, int x1b, int y1, int x2a, i
     LICE_COMBINEFUNC blitfunc=NULL;      
 #define __LICE__ACTION(comb) blitfunc=comb::doPix;
 #else
-#define __LICE__ACTION(COMBFUNC) _LICE_Fill<COMBFUNC>::FillClippedTrapezoid(dest, x1a, x1b, dxady, dxbdy, y1, y2, color, aw);
+#define __LICE__ACTION(COMBFUNC) _LICE_Fill<COMBFUNC>::FillClippedTrapezoid(dest, x1a, x1b, dxady, dxbdy, y1, y2,a,b, astep,bstep, color, aw);
 #endif
 
     __LICE_ACTION_CONSTANTALPHA(mode, aw, false);
 
 #ifdef LICE_FAVOR_SIZE_EXTREME
-      if (blitfunc) _LICE_Fill::FillClippedTrapezoid(dest, x1a, x1b, dxady, dxbdy, y1, y2, color, aw, blitfunc);
+      if (blitfunc) _LICE_Fill::FillClippedTrapezoid(dest, x1a, x1b, dxady, dxbdy, y1, y2,a,b, astep,bstep, color, aw, blitfunc);
 #endif
 
 #undef __LICE__ACTION
@@ -1505,7 +1475,7 @@ void LICE_FillTrapezoid(LICE_IBitmap* dest, int x1a, int x1b, int y1, int x2a, i
 }
 
 
-int _ysort(const void* a, const void* b)
+static int _ysort(const void* a, const void* b)
 {
   int* xya = (int*)a;
   int* xyb = (int*)b;
