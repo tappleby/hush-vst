@@ -264,8 +264,8 @@ LICE = \
 #"$(INTDIR)/lice_png_write.obj" \
 #"$(INTDIR)/lice_svg.obj" \
 #"$(INTDIR)/lice_texgen.obj" \
-"$(INTDIR)/lice_text.obj" \
-#"$(INTDIR)/lice_textnew.obj"
+#"$(INTDIR)/lice_text.obj" \
+"$(INTDIR)/lice_textnew.obj"
 
 lice : $(LICE)
 
