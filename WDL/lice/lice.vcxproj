@@ -381,7 +381,7 @@
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
-    <ClCompile Include="lice_text.cpp" />
+    <ClCompile Include="lice_textnew.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\jpeglib\jchuff.h" />
