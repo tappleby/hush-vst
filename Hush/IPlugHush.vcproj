@@ -18,8 +18,8 @@
 	<Configurations>
 		<Configuration
 			Name="Debug|Win32"
-			OutputDirectory="$(ConfigurationName)"
-			IntermediateDirectory="$(ConfigurationName)"
+			OutputDirectory=".\build\$(ConfigurationName)\bin"
+			IntermediateDirectory=".\build\$(ConfigurationName)\obj"
 			ConfigurationType="2"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			CharacterSet="2"
@@ -42,7 +42,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="..\IPlug;..\..\wdl\lice;..\VST_SDK\vstsdk2.4\pluginterfaces\vst2.x"
+				AdditionalIncludeDirectories="..\WDL\IPlug;..\wdl\lice;..\VST_SDK;..\WDL"
 				PreprocessorDefinitions="VST_API;WIN32;_WIN32_WINNT=0x0501;WINVER=0x0501;_CRT_SECURE_NO_DEPRECATE;_DEBUG"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -67,7 +67,7 @@
 				AdditionalDependencies="shell32.lib lice.lib IPlug.lib user32.lib gdi32.lib comdlg32.lib advapi32.lib"
 				OutputFile="$(OutDir)/$(ProjectName)_DEBUG.dll"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="&quot;..\..\IPlug\$(ConfigurationName)&quot;;&quot;..\..\lice\$(ConfigurationName)&quot;"
+				AdditionalLibraryDirectories="..\WDL\IPlug\$(ConfigurationName)"
 				GenerateManifest="false"
 				EnableUAC="false"
 				IgnoreDefaultLibraryNames=""
@@ -105,8 +105,8 @@
 		</Configuration>
 		<Configuration
 			Name="Release|Win32"
-			OutputDirectory="$(ConfigurationName)"
-			IntermediateDirectory="$(ConfigurationName)"
+			OutputDirectory=".\build\$(ConfigurationName)\bin"
+			IntermediateDirectory=".\build\$(ConfigurationName)\obj"
 			ConfigurationType="2"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			CharacterSet="2"
@@ -128,7 +128,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="..\IPlug;..\..\wdl\lice;..\VST_SDK\vstsdk2.4\pluginterfaces\vst2.x"
+				AdditionalIncludeDirectories="..\WDL\IPlug;..\wdl\lice;..\VST_SDK;..\WDL"
 				PreprocessorDefinitions="VST_API;WIN32;_WIN32_WINNT=0x0501;WINVER=0x0501;_CRT_SECURE_NO_DEPRECATE"
 				RuntimeLibrary="0"
 				UsePrecompiledHeader="0"
@@ -151,7 +151,7 @@
 				AdditionalDependencies="shell32.lib lice.lib IPlug.lib user32.lib gdi32.lib comdlg32.lib advapi32.lib"
 				OutputFile="$(OutDir)/$(ProjectName).dll"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="&quot;..\..\IPlug\$(ConfigurationName)&quot;;&quot;..\..\lice\$(ConfigurationName)&quot;"
+				AdditionalLibraryDirectories="..\WDL\IPlug\$(ConfigurationName)"
 				GenerateManifest="false"
 				ModuleDefinitionFile=""
 				GenerateDebugInformation="true"
@@ -187,8 +187,8 @@
 		</Configuration>
 		<Configuration
 			Name="Tracer|Win32"
-			OutputDirectory="$(ConfigurationName)"
-			IntermediateDirectory="$(ConfigurationName)"
+			OutputDirectory=".\build\$(ConfigurationName)\bin"
+			IntermediateDirectory=".\build\$(ConfigurationName)\obj"
 			ConfigurationType="2"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			CharacterSet="2"
@@ -210,7 +210,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories=""
+				AdditionalIncludeDirectories="..\WDL\IPlug;..\wdl\lice;..\VST_SDK"
 				PreprocessorDefinitions="TRACER_BUILD;VST_API;WIN32;_WIN32_WINNT=0x0501;WINVER=0x0501;_CRT_SECURE_NO_DEPRECATE"
 				RuntimeLibrary="0"
 				UsePrecompiledHeader="0"
@@ -233,7 +233,7 @@
 				AdditionalDependencies="shell32.lib lice.lib IPlug.lib user32.lib gdi32.lib comdlg32.lib advapi32.lib"
 				OutputFile="$(OutDir)/$(ProjectName)_TRACER.dll"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="&quot;..\..\IPlug\$(ConfigurationName)&quot;;..\..\lice\Release"
+				AdditionalLibraryDirectories="..\WDL\IPlug\$(ConfigurationName)"
 				GenerateManifest="false"
 				ModuleDefinitionFile=""
 				GenerateDebugInformation="true"

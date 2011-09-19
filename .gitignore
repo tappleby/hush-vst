@@ -5,4 +5,6 @@
 *.ncb
 *.log 
 *.DS_Store
-Debug/
+[Bb]uild/
+[Rr]elease/
+[Dd]ebug/

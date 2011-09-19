@@ -331,6 +331,7 @@ public:
 	void ClearTextFromPlug() { SetTextFromPlug(""); }
 
 	const IText* GetIText() const { return &mText; }
+	IText& GetITTextRef() { return mText; }
 
 	bool Draw(IGraphics* pGraphics);
 

@@ -231,7 +231,6 @@ void PlugHush::SetMidiAreaText(char* pText, const IColor* color)
         ITextControl* pTextCtrl = (ITextControl*)(GetGUI()->GetControl(m_nMidiTextIdx));
         pTextCtrl->SetTextFromPlug(pText);
         
-        //pTextCtrl->GetIText()->mColor.A = color->A;// (, color->R, color->G, color->B);
         pTextCtrl->GetITTextRef().mColor.A = color->A;
         pTextCtrl->GetITTextRef().mColor.R = color->R;
         pTextCtrl->GetITTextRef().mColor.G = color->G;

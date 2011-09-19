@@ -4,6 +4,7 @@
 	Version="9.00"
 	Name="IPlug"
 	ProjectGUID="{D744660A-89B6-4EA7-A085-BF92ABE4540F}"
+	RootNamespace="IPlug"
 	Keyword="Win32Proj"
 	TargetFrameworkVersion="131072"
 	>
@@ -41,7 +42,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories=""
+				AdditionalIncludeDirectories="..\lice"
 				PreprocessorDefinitions="WIN32;_CRT_SECURE_NO_DEPRECATE"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -114,7 +115,7 @@
 				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="1"
 				WholeProgramOptimization="false"
-				AdditionalIncludeDirectories=""
+				AdditionalIncludeDirectories="..\lice"
 				PreprocessorDefinitions="WIN32;_CRT_SECURE_NO_DEPRECATE"
 				RuntimeLibrary="0"
 				BufferSecurityCheck="false"
@@ -182,7 +183,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="2"
-				AdditionalIncludeDirectories=""
+				AdditionalIncludeDirectories="..\lice"
 				PreprocessorDefinitions="TRACER_BUILD;WIN32;_CRT_SECURE_NO_DEPRECATE"
 				RuntimeLibrary="0"
 				UsePrecompiledHeader="0"
@@ -305,6 +306,14 @@
 			</File>
 			<File
 				RelativePath=".\IControl.h"
+				>
+			</File>
+			<File
+				RelativePath=".\IPopupControl.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\IPopupControl.h"
 				>
 			</File>
 		</Filter>
