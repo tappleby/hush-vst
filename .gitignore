@@ -1,0 +1,8 @@
+/VST_SDK
+*.user
+*.suo
+*.bak
+*.ncb
+*.log 
+*.DS_Store
+Debug/
