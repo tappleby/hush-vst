@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VariablesStackState
+   version = "1.0">
+   <StackStates>
+      <StackState
+         stackFrameDescription = "PlugHush::OnParamChange(int):IPlugHush.cpp">
+         <expressions>
+            <expression
+               value = "(bool)(paramIdx &gt;= 2)">
+            </expression>
+         </expressions>
+      </StackState>
+      <StackState
+         stackFrameDescription = "IPopupControl::OnMouseUp(int, int, IMouseMod*):IPopupControl.cpp">
+         <expressions>
+            <expression
+               value = "(m_menuposition.y + (mBitmap.H / mBitmap.N) &lt; p.y)">
+            </expression>
+            <expression
+               value = "(m_menuposition.y &gt; p.y)">
+            </expression>
+            <expression
+               value = "m_menuposition">
+            </expression>
+            <expression
+               value = "mPlug-&gt;GetGUI()">
+            </expression>
+            <expression
+               value = "(m_menuposition.x &gt; p.x)">
+            </expression>
+            <expression
+               value = "(m_menuposition.x + mBitmap.W &lt; p.x)">
+            </expression>
+         </expressions>
+      </StackState>
+      <StackState
+         stackFrameDescription = "TrackPopupMenu(HMENU__*, int, int, int, int, HWND__*, RECT const*):swell-menu.mm">
+         <expressions>
+            <expression
+               value = "(NSWindow*)[NSApp mainWindow]">
+            </expression>
+         </expressions>
+      </StackState>
+   </StackStates>
+</VariablesStackState>
